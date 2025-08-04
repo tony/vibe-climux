@@ -2,6 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL: Code Modification Guidelines
+
+**ALWAYS READ AND UNDERSTAND BEFORE MODIFYING**
+- Read existing files thoroughly before making changes
+- Understand the current implementation and its purpose
+- Do not duplicate functionality that already exists
+- Do not create new files unless absolutely necessary
+- Prefer modifying existing files over creating new ones
+- Be mindful of project scope - avoid feature creep
+- Focus on fixing the specific issue, not expanding functionality
+
+When working on this codebase:
+1. **Read first**: Always use the Read tool to understand existing code
+2. **Check for duplicates**: Search for similar functionality before implementing
+3. **Minimal changes**: Make the smallest change that solves the problem
+4. **Avoid overhead**: Don't create test files, documentation, or examples unless specifically requested
+5. **Stay focused**: Address only what was asked, nothing more
+
 ## Project Overview
 
 Climux is a headless CLI process manager written in Python 3.13+ using only the standard library. It provides tmux-like functionality for managing background processes with full programmatic control via JSON-RPC 2.0 over Unix sockets.
