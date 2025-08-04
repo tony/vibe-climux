@@ -252,6 +252,14 @@ class ManagedProcess:
             return
 
         self.exit_code = await self.process.wait()
+
+        # CRUCIAL: Wait for stream readers to finish before logging exit
+        # This ensures we capture all output from short-lived processes
+        if hasattr(self, "_stdout_task") and hasattr(self, "_stderr_task"):
+            await asyncio.gather(
+                self._stdout_task, self._stderr_task, return_exceptions=True
+            )
+
         self.status = "exited"
         self.pid = None
         self._add_log("system", f"Process exited with code {self.exit_code}")
