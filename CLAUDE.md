@@ -1,0 +1,60 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Climux is a headless CLI process manager written in Python 3.13+ using only the standard library. It provides tmux-like functionality for managing background processes with full programmatic control via JSON-RPC 2.0 over Unix sockets.
+
+## Key Features
+
+- **Command Structure**: Commands like `climux start`, `climux list`, `climux tail`, etc.
+- **Socket Management**: Reuses a default socket unless `-L` or `-S` is explicitly specified
+- **JSON-RPC Control**: Uses JSON-RPC 2.0 over Unix sockets for internal and agentic control
+- **Terminal I/O**: Exposes raw terminal I/O (tail, send, snapshot) via CLI
+- **Log Buffering**: Both time-based and line-based log buffers (1000 lines / 24 hours by default)
+- **Programmatic Interaction**: Send stdin to processes via commands like `climux send 1 "q"`
+- **Asyncio-based**: All subprocess management is asyncio-based
+- **Guaranteed Cleanup**: Includes guaranteed cleanup of processes with `/tmp` PID journal fallback
+
+## Development Commands
+
+### Package Management
+- **Install dependencies**: `uv sync --all-extras --dev`
+- **Add a dependency**: `uv add <package>`
+- **Add a dev dependency**: `uv add --dev <package>`
+
+### Testing
+- **Run all tests**: `uv run pytest` or `uv run py.test`
+- **Run a specific test**: `uv run pytest tests/test_app.py::test_version`
+- **Watch mode (auto-test)**: `uv run pytest-watcher`
+
+### Code Quality
+- **Run all checks**: `uv run ruff check . && uv run ruff format . --check && uv run mypy .`
+- **Lint code**: `uv run ruff check .`
+- **Format code**: `uv run ruff format .`
+- **Type checking**: `uv run mypy .`
+
+## Architecture
+
+### Design Principles
+- **Standard Library Only**: No external dependencies in production code
+- **Strict Typing**: Full type annotations throughout the codebase
+- **Asyncio-based**: All I/O operations use asyncio for concurrent process management
+- **Headless Operation**: Designed for automation and agentic workflows without GUI
+
+### Components
+1. **CLI Interface**: Command-line interface for process control
+2. **Socket Server**: Unix socket server for JSON-RPC communication
+3. **Process Manager**: Manages subprocess lifecycle with asyncio
+4. **Log Buffer**: Configurable line and time-based buffering system
+5. **Cleanup System**: PID journaling in `/tmp` for guaranteed process cleanup
+
+### Socket Options
+- `-L socket-name`: Specifies the name of the socket within the default or TMPDIR location
+- `-S socket-path`: Specifies the full path to the socket, overriding the default location
+
+### Configuration
+- **pyproject.toml**: Central configuration for dev dependencies, tools, and project metadata
+- **Strict Type Checking**: mypy configured with strict mode enforcing type safety
+- **Comprehensive Linting**: ruff configured with extensive rule sets for code quality
