@@ -278,3 +278,59 @@ climux ps --json | jq '.[] | select(.status=="running") | .name'
 ```
 
 These improvements would make climux more intuitive for both human users and AI agents, reducing cognitive load and making common operations faster.
+
+## Real-Time Log Testing Questions (2025-08-04)
+
+### Context
+Working on implementing real-time log tailing for climux. Created test fixtures in `test_realtime_logs.py` but encountering challenges with asyncio, pytest, and streaming architecture.
+
+### Questions for Expert Research
+
+#### 1. Real-time Log Streaming Architecture
+- How to extend JSON-RPC over Unix sockets for streaming (no WebSockets/SSE)?
+- Best pattern for handling backpressure with 10-100 msgs/sec normal, 1000+ bursts?
+- How to multiplex logs from 5-50+ processes into single stream?
+
+#### 2. Testing Asyncio Queue-based Streaming
+- Is the LogStreamCollector pattern with `asyncio.wait_for(queue.get(), timeout=0.1)` correct?
+- How to ensure no logs missed between process start and monitor attachment?
+- Best practices for background task cleanup in test fixtures?
+
+#### 3. Pytest-asyncio Integration
+- How to synchronize test assertions with async log generation?
+- `asyncio.gather()` vs `asyncio.create_task()` for multiple monitors?
+- Best timeout patterns - `asyncio.wait_for()` vs pytest timeouts?
+
+#### 4. Process Output Buffering Issues
+- Short-lived processes (`echo "text"`) exit before output captured
+- Python with `flush=True` works, but simple commands don't
+- How to ensure all output captured before process exit in async context?
+
+#### 5. Testing High-Volume Scenarios
+- Pattern for verifying no logs dropped under high volume?
+- How to verify ordering preserved with multiple concurrent processes?
+- Should assertions be in collector or after collection?
+
+#### 6. JSON-RPC Streaming Extensions
+- Best way to implement subscribe/unsubscribe for tailing over JSON-RPC?
+- Should use separate endpoint or extend existing protocol?
+- How to handle client disconnection during streaming?
+
+#### 7. Test Fixture Design
+- Is the current fixture pattern (setup collectors/tasks, yield function, cleanup) correct?
+- How to handle cleanup when tests fail?
+- Should fixtures manage own event loop or rely on pytest-asyncio's?
+
+#### 8. Race Condition Prevention
+- Process starting/exiting before monitor attaches
+- Logs added between queue creation and collection start
+- Test assertions running before async operations complete
+- What patterns prevent these races?
+
+### Requirements & Constraints
+- **Must use**: Unix sockets + JSON-RPC (no external deps)
+- **Python**: 3.13+ standard library only
+- **Performance**: 10-100 msgs/sec normal, handle 1000+ bursts
+- **Scale**: 5-20 processes typical, support 50+
+- **Testing**: pytest-xdist compatible, <5 sec per test, no flaky failures
+- **Environment**: Local + GitHub Actions CI (2 cores, 7GB RAM)
