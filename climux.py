@@ -16,12 +16,11 @@ import os
 import signal
 import sys
 import tempfile
-import time
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any
 
 # --- Constants ---
 SOCKET_DIR = Path(tempfile.gettempdir()) / "climux"
@@ -37,10 +36,10 @@ SNAPSHOT_DEFAULT_LINES = 25
 class ProcessConfig:
     """Configuration for a managed process."""
 
-    command: List[str]
-    name: Optional[str] = None
-    cwd: Optional[Path] = None
-    env: Optional[Dict[str, str]] = None
+    command: list[str]
+    name: str | None = None
+    cwd: Path | None = None
+    env: dict[str, str] | None = None
     max_log_lines: int = DEFAULT_MAX_LOG_LINES
     max_log_hours: float = DEFAULT_MAX_LOG_HOURS
 
@@ -53,7 +52,7 @@ class LogEntry:
     source: str  # stdout, stderr, or system
     content: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -68,15 +67,13 @@ class ManagedProcess:
 
     id: int
     config: ProcessConfig
-    process: Optional[asyncio.subprocess.Process] = None
+    process: asyncio.subprocess.Process | None = None
     status: str = "stopped"  # stopped, running, failed, exited
-    pid: Optional[int] = None
-    exit_code: Optional[int] = None
-    start_time: Optional[datetime] = None
-    logs: Deque[LogEntry] = field(default_factory=deque)
-    _log_watchers: List[asyncio.Queue[Optional[LogEntry]]] = field(
-        default_factory=list
-    )
+    pid: int | None = None
+    exit_code: int | None = None
+    start_time: datetime | None = None
+    logs: deque[LogEntry] = field(default_factory=deque)
+    _log_watchers: list[asyncio.Queue[LogEntry | None]] = field(default_factory=list)
 
     async def start(self) -> bool:
         """Start the process."""
@@ -102,7 +99,7 @@ class ManagedProcess:
 
             self.pid = self.process.pid
             self.status = "running"
-            self.start_time = datetime.now(timezone.utc)
+            self.start_time = datetime.now(UTC)
             self.exit_code = None
 
             # Start log handlers
@@ -110,9 +107,7 @@ class ManagedProcess:
             asyncio.create_task(self._read_stream(self.process.stderr, "stderr"))
             asyncio.create_task(self._monitor_exit())
 
-            self._add_log(
-                "system", f"Process started with PID {self.pid}"
-            )
+            self._add_log("system", f"Process started with PID {self.pid}")
             return True
 
         except Exception as e:
@@ -129,8 +124,8 @@ class ManagedProcess:
             self._add_log("system", f"Sending SIGTERM to PID {self.pid}")
             self.process.terminate()
             await asyncio.wait_for(self.process.wait(), timeout=5.0)
-        except asyncio.TimeoutError:
-            self._add_log("system", f"Process did not terminate, sending SIGKILL")
+        except TimeoutError:
+            self._add_log("system", "Process did not terminate, sending SIGKILL")
             self.process.kill()
             await self.process.wait()
 
@@ -158,11 +153,11 @@ class ManagedProcess:
             self._add_log("system", f"Failed to write to stdin: {e}")
             return False
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current status as a dictionary."""
         uptime = None
         if self.start_time and self.status == "running":
-            uptime = str(datetime.now(timezone.utc) - self.start_time)
+            uptime = str(datetime.now(UTC) - self.start_time)
 
         return {
             "id": self.id,
@@ -176,8 +171,8 @@ class ManagedProcess:
         }
 
     def get_logs(
-        self, lines: Optional[int] = None, since: Optional[datetime] = None
-    ) -> List[Dict[str, Any]]:
+        self, lines: int | None = None, since: datetime | None = None
+    ) -> list[dict[str, Any]]:
         """Get logs, optionally filtered."""
         logs = list(self.logs)
 
@@ -187,9 +182,7 @@ class ManagedProcess:
 
         # Trim old logs by age
         if self.config.max_log_hours > 0:
-            cutoff = datetime.now(timezone.utc) - timedelta(
-                hours=self.config.max_log_hours
-            )
+            cutoff = datetime.now(UTC) - timedelta(hours=self.config.max_log_hours)
             logs = [log for log in logs if log.timestamp >= cutoff]
 
         # Limit number of lines
@@ -198,13 +191,13 @@ class ManagedProcess:
 
         return [log.to_dict() for log in logs]
 
-    async def tail_logs(self) -> asyncio.Queue[Optional[LogEntry]]:
+    async def tail_logs(self) -> asyncio.Queue[LogEntry | None]:
         """Create a queue for tailing logs in real-time."""
-        queue: asyncio.Queue[Optional[LogEntry]] = asyncio.Queue()
+        queue: asyncio.Queue[LogEntry | None] = asyncio.Queue()
         self._log_watchers.append(queue)
         return queue
 
-    def stop_tail(self, queue: asyncio.Queue[Optional[LogEntry]]) -> None:
+    def stop_tail(self, queue: asyncio.Queue[LogEntry | None]) -> None:
         """Stop tailing logs."""
         if queue in self._log_watchers:
             self._log_watchers.remove(queue)
@@ -214,7 +207,7 @@ class ManagedProcess:
     def _add_log(self, source: str, content: str) -> None:
         """Add a log entry and notify watchers."""
         entry = LogEntry(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             source=source,
             content=content,
         )
@@ -233,7 +226,7 @@ class ManagedProcess:
                 pass
 
     async def _read_stream(
-        self, stream: Optional[asyncio.StreamReader], source: str
+        self, stream: asyncio.StreamReader | None, source: str
     ) -> None:
         """Read from a stream and log the output."""
         if not stream:
@@ -278,9 +271,9 @@ class ClimuxServer:
         self.pid_journal_path = socket_path.parent / (
             PID_JOURNAL_PREFIX + socket_path.stem + ".json"
         )
-        self.processes: Dict[int, ManagedProcess] = {}
+        self.processes: dict[int, ManagedProcess] = {}
         self.next_id = 1
-        self._server: Optional[asyncio.Server] = None
+        self._server: asyncio.Server | None = None
         self._running = False
 
     async def start(self) -> None:
@@ -355,9 +348,7 @@ class ClimuxServer:
                     request = json.loads(data.decode())
                     response = await self._dispatch_request(request)
                 except json.JSONDecodeError as e:
-                    response = self._error_response(
-                        -32700, f"Parse error: {e}", None
-                    )
+                    response = self._error_response(-32700, f"Parse error: {e}", None)
                 except Exception as e:
                     response = self._error_response(
                         -32603, f"Internal error: {e}", None
@@ -374,7 +365,7 @@ class ClimuxServer:
             writer.close()
             await writer.wait_closed()
 
-    async def _dispatch_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def _dispatch_request(self, request: dict[str, Any]) -> dict[str, Any]:
         """Dispatch a JSON-RPC request."""
         method = request.get("method")
         params = request.get("params", {})
@@ -404,7 +395,7 @@ class ClimuxServer:
 
     # --- Request handlers ---
 
-    async def _handle_start(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_start(self, params: dict[str, Any]) -> dict[str, Any]:
         """Start a new process."""
         command = params.get("command", [])
         if not command:
@@ -433,11 +424,11 @@ class ClimuxServer:
             del self.processes[process_id]
             raise RuntimeError("Failed to start process")
 
-    async def _handle_list(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _handle_list(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """List all processes."""
         return [p.get_status() for p in self.processes.values()]
 
-    async def _handle_stop(self, params: Dict[str, Any]) -> Dict[str, str]:
+    async def _handle_stop(self, params: dict[str, Any]) -> dict[str, str]:
         """Stop a process."""
         process_id = params.get("id")
         process = self.processes.get(process_id)
@@ -448,7 +439,7 @@ class ClimuxServer:
         self._update_pid_journal()
         return {"status": "stopped", "id": process_id}
 
-    async def _handle_restart(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_restart(self, params: dict[str, Any]) -> dict[str, Any]:
         """Restart a process."""
         process_id = params.get("id")
         process = self.processes.get(process_id)
@@ -459,7 +450,7 @@ class ClimuxServer:
         self._update_pid_journal()
         return process.get_status()
 
-    async def _handle_send(self, params: Dict[str, Any]) -> Dict[str, str]:
+    async def _handle_send(self, params: dict[str, Any]) -> dict[str, str]:
         """Send input to a process."""
         process_id = params.get("id")
         data = params.get("data", "")
@@ -474,7 +465,7 @@ class ClimuxServer:
 
         return {"status": "sent", "id": process_id}
 
-    async def _handle_logs(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _handle_logs(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """Get process logs."""
         process_id = params.get("id")
         lines = params.get("lines")
@@ -485,12 +476,12 @@ class ClimuxServer:
 
         return process.get_logs(lines=lines)
 
-    async def _handle_tail(self, params: Dict[str, Any]) -> Dict[str, str]:
+    async def _handle_tail(self, params: dict[str, Any]) -> dict[str, str]:
         """Tail process logs (streaming not implemented in basic version)."""
         # For simplicity, return recent logs
         return await self._handle_logs(params)
 
-    async def _handle_snapshot(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _handle_snapshot(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """Get a snapshot of recent output."""
         process_id = params.get("id")
         lines = params.get("lines", SNAPSHOT_DEFAULT_LINES)
@@ -501,15 +492,15 @@ class ClimuxServer:
 
         return process.get_logs(lines=lines)
 
-    async def _handle_ping(self, params: Dict[str, Any]) -> str:
+    async def _handle_ping(self, params: dict[str, Any]) -> str:
         """Ping the server."""
         return "pong"
 
     # --- Helper methods ---
 
     def _error_response(
-        self, code: int, message: str, req_id: Optional[Any]
-    ) -> Dict[str, Any]:
+        self, code: int, message: str, req_id: Any | None
+    ) -> dict[str, Any]:
         """Create a JSON-RPC error response."""
         return {
             "jsonrpc": "2.0",
@@ -555,7 +546,7 @@ class ClimuxClient:
     def __init__(self, socket_path: Path):
         self.socket_path = socket_path
 
-    async def request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    async def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Send a request to the server."""
         try:
             reader, writer = await asyncio.open_unix_connection(str(self.socket_path))
@@ -643,9 +634,7 @@ def main() -> None:
 
     logs_parser = subparsers.add_parser("logs", help="Show process logs")
     logs_parser.add_argument("id", type=int, help="Process ID")
-    logs_parser.add_argument(
-        "--lines", type=int, help="Number of lines to show"
-    )
+    logs_parser.add_argument("--lines", type=int, help="Number of lines to show")
 
     tail_parser = subparsers.add_parser("tail", help="Tail process logs")
     tail_parser.add_argument("id", type=int, help="Process ID")
