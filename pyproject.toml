@@ -14,8 +14,11 @@ dependencies = []
 dev-dependencies = [
   ### Testing ###
   "pytest",
+  "pytest-asyncio",
   "pytest-rerunfailures",
+  "pytest-timeout",
   "pytest-watcher",
+  "pytest-xdist",
     # Lint
   "ruff",
   "mypy",
