@@ -26,7 +26,7 @@ Climux is a headless CLI process manager written in Python 3.13+ using only the 
 
 ### Testing
 - **Run all tests**: `uv run pytest` or `uv run py.test`
-- **Run a specific test**: `uv run pytest tests/test_app.py::test_version`
+- **Run a specific test**: `uv run pytest tests/test_climux.py::TestBasicOperations::test_server_ping`
 - **Watch mode (auto-test)**: `uv run pytest-watcher`
 
 ### Code Quality
@@ -34,6 +34,18 @@ Climux is a headless CLI process manager written in Python 3.13+ using only the 
 - **Lint code**: `uv run ruff check .`
 - **Format code**: `uv run ruff format .`
 - **Type checking**: `uv run mypy .`
+
+### Important Note for Development
+When you see commands like:
+```bash
+uv run ruff check . --fix --show-fixes; uv run ruff format .; uv run mypy; uv run py.test
+```
+
+This is an indication to investigate deeper rather than just apply fixes:
+- **Don't automatically fix**: The `--fix` flag is a signal to understand what's wrong
+- **Find root causes**: Look at what ruff/mypy are complaining about and understand why
+- **Inspect test failures**: Don't just make tests pass - understand what they're testing and why they failed
+- **Consider design implications**: Linting and type errors often indicate design issues, not just syntax problems
 
 ## Architecture
 
