@@ -37,6 +37,12 @@ Climux is a headless CLI process manager written in Python 3.13+ using only the 
 
 ## Architecture
 
+### Project Structure
+- **climux.py**: Main implementation file containing server, client, and process management logic
+- **tests/**: Comprehensive test suite using pytest and pytest-asyncio
+  - **conftest.py**: Test fixtures and utilities for isolated testing
+  - **test_climux.py**: Functional tests covering all features
+
 ### Design Principles
 - **Standard Library Only**: No external dependencies in production code
 - **Strict Typing**: Full type annotations throughout the codebase

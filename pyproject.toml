@@ -29,7 +29,8 @@ dev-dependencies = [
 strict = true
 python_version = "3.12"
 files = [
-  "src/",
+  "climux.py",
+  "tests/",
 ]
 
 [tool.ruff]
@@ -79,7 +80,7 @@ convention = "numpy"
 addopts = "--tb=short --no-header --showlocals --doctest-modules"
 doctest_optionflags = "ELLIPSIS NORMALIZE_WHITESPACE"
 testpaths = [
-  "src",
+  "tests",
 ]
 
 [tool.pytest-watcher]
