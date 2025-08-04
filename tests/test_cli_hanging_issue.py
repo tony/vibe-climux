@@ -113,3 +113,93 @@ async def test_cli_tail_fixed_with_pexpect(climux_server, climux_client):
     finally:
         if child.isalive():
             child.close(force=True)
+
+
+@pytest.mark.asyncio
+async def test_cli_tail_with_signal_synchronization(climux_server, climux_client):
+    """
+    This test uses signal-based synchronization instead of time.sleep()
+    for deterministic testing.
+    """
+    import os
+    import signal
+
+    import pexpect
+
+    # Start a process that outputs immediately, waits for signal, then outputs more
+    result = await climux_client.request(
+        "start",
+        {
+            "command": [
+                "python",
+                "-u",  # Unbuffered
+                "-c",
+                """import signal, sys, time
+def handler(sig, frame):
+    print('Signal received, outputting logs', flush=True)
+    for i in range(3):
+        print(f'Log line {i}', flush=True)
+    sys.exit(0)
+
+signal.signal(signal.SIGUSR1, handler)
+print('Process ready for signal', flush=True)
+# Keep process alive waiting for signal
+while True:
+    time.sleep(0.1)
+""",
+            ],
+            "name": "signal_test_process",
+        },
+    )
+    process_id = result["id"]
+    process_pid = result["pid"]
+
+    # Give process a moment to start and output initial message
+    await asyncio.sleep(0.5)
+
+    # Start tailing - it should show existing logs and then wait for more
+    cmd = f"{sys.executable} {CLIMUX_PATH} -S {climux_server.socket_path} logs --tail {process_id}"
+    child = pexpect.spawn(cmd, encoding="utf-8", timeout=10)
+
+    try:
+        # Give the streaming a moment to start
+        await asyncio.sleep(0.5)
+
+        # Should see the "Process ready for signal" that was already output
+        index = await child.expect(
+            [r"\[.*\] \[stdout\] Process ready for signal", pexpect.TIMEOUT],
+            async_=True,
+        )
+        assert index == 0, "Should see the process ready message"
+        print("✓ Saw initial 'Process ready' message")
+
+        # Now signal the process to start outputting
+        os.kill(process_pid, signal.SIGUSR1)
+
+        # Expect the output that happens after signaling
+        index = await child.expect(
+            [r"\[.*\] \[stdout\] Signal received, outputting logs", pexpect.TIMEOUT],
+            async_=True,
+        )
+        assert index == 0, "Should see signal received message"
+        print("✓ Signal was received and process responded")
+
+        # Verify we see the subsequent log lines
+        for i in range(3):
+            index = await child.expect(
+                [rf"\[.*\] \[stdout\] Log line {i}", pexpect.TIMEOUT], async_=True
+            )
+            assert index == 0, f"Should see log line {i}"
+            print(f"✓ Saw log line {i}")
+
+        # Process should exit after outputting
+        index = await child.expect(
+            [r"\[.*\] \[system\] Process exited with code 0", pexpect.TIMEOUT],
+            async_=True,
+        )
+        assert index == 0, "Process should exit cleanly"
+        print("✓ Process exited cleanly")
+
+    finally:
+        if child.isalive():
+            child.close(force=True)

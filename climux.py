@@ -375,6 +375,9 @@ class ClimuxServer:
 
         except asyncio.CancelledError:
             raise
+        except BrokenPipeError:
+            # Normal when client disconnects during streaming
+            pass
         except Exception:
             pass  # Client disconnected
         finally:
@@ -382,7 +385,11 @@ class ClimuxServer:
             if self._streaming_manager:
                 await self._streaming_manager.cleanup_writer(writer)
             writer.close()
-            await writer.wait_closed()
+            try:
+                await writer.wait_closed()
+            except BrokenPipeError:
+                # Can happen if client disconnected abruptly
+                pass
 
     async def _dispatch_request(
         self, request: dict[str, Any], writer: asyncio.StreamWriter
@@ -908,9 +915,8 @@ def main() -> None:
                     # Real-time streaming mode
                     try:
                         async for entry in client.subscribe_logs([args.id]):
-                            print(
-                                f"[{entry['timestamp']}] [{entry['source']}] {entry['content']}"
-                            )
+                            line = f"[{entry['timestamp']}] [{entry['source']}] {entry['content']}"
+                            print(line, flush=True)  # Force flush for PTY
                     except KeyboardInterrupt:
                         print("\nStopped tailing logs")
                 else:
