@@ -161,10 +161,54 @@ def unique_socket_path(tmp_path):
    - [x] Clean separation of concerns
    - [x] Comprehensive error handling
 
-## Next Steps
+## Implementation Status (2025-08-04)
 
-1. Create `streaming.py` module with core streaming logic
-2. Update `climux.py` with subscribe/unsubscribe handlers
-3. Fix process exit race condition
-4. Implement comprehensive test suite
-5. Performance testing and optimization
+### ✅ Completed
+1. Created `streaming.py` module with `StreamingManager` class
+2. Updated `climux.py` with `log.subscribe` and `log.unsubscribe` handlers
+3. Fixed process exit race condition (wait for streams before logging exit)
+4. Implemented comprehensive test suite:
+   - `test_short_lived_processes.py` - 5 tests
+   - `test_streaming_fixtures.py` - 3 tests  
+   - `test_json_rpc_streaming.py` - 4 tests
+5. All 12 tests passing consistently
+
+### 🚧 Remaining Tasks
+
+#### 1. CLI Client Integration
+```python
+# Need to update ClimuxClient to support streaming:
+class ClimuxClient:
+    async def subscribe_logs(self, process_ids: list[int]) -> AsyncGenerator[LogEntry, None]:
+        """Subscribe to real-time logs."""
+        # Send subscribe request
+        # Start background reader task
+        # Yield log entries as they arrive
+        
+# CLI command updates:
+# climux logs --tail <process_id>
+# climux logs --tail --all
+# climux logs -f <name>  # by process name
+```
+
+#### 2. Enhanced pytest Fixtures
+```python
+@pytest_asyncio.fixture
+async def streaming_monitor(climux_server):
+    """High-level fixture for streaming tests."""
+    # Provides easy API for common streaming test patterns
+    # Handles subscription lifecycle
+    # Event-based synchronization built-in
+```
+
+#### 3. Multi-Process Streaming Tests
+- Test streaming from 10+ processes simultaneously
+- Verify log ordering within each process
+- Test backpressure with slow consumers
+- High-volume stress tests (1000+ msgs/sec)
+
+#### 4. Additional Features
+- Process name resolution in streaming
+- Log filtering (by level, source, content)
+- Reconnection handling
+- Rate limiting options
