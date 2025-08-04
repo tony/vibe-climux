@@ -102,6 +102,7 @@ async def deploy_and_monitor(client: ClimuxClient):
 ## Core Features
 
 - **Implicit Server Start**: Like tmux, the server starts automatically when needed
+- **Parallel Task Execution**: Fire off multiple tasks and check results later
 - **Standard Library Only**: Zero dependencies, works with Python 3.13+
 - **JSON-RPC 2.0**: Structured communication protocol that's LLM-friendly
 - **Full Process Control**: Start, stop, restart, send input, capture output
@@ -109,6 +110,40 @@ async def deploy_and_monitor(client: ClimuxClient):
 - **Guaranteed Cleanup**: PID journaling ensures no orphaned processes
 - **Asyncio-based**: Efficient concurrent process management
 - **Type-Safe**: Fully typed for better IDE support and fewer bugs
+
+## 🚀 The Power of Parallel Execution
+
+One of climux's superpowers is **deferred parallel execution**. Instead of waiting for each task to complete, you can:
+
+```bash
+# Fire off multiple tasks in parallel
+climux start "ruff check ." --name ruff-check
+climux start "ruff format . --check" --name ruff-format
+climux start "mypy ." --name mypy
+climux start "pytest" --name tests
+
+# Continue working while they run...
+# Then check results when convenient
+climux logs ruff-check
+climux logs mypy --lines 50
+```
+
+**For Developers**: Run all your linters, formatters, and tests simultaneously. No more waiting for one to finish before starting the next.
+
+**For AI Agents**: Fire off multiple analysis tasks, continue reasoning about the problem, then circle back to collect results:
+
+```python
+# AI agent can parallelize investigation
+await client.request("start", {"command": ["biome", "lint"], "name": "lint"})
+await client.request("start", {"command": ["biome", "check"], "name": "check"})
+await client.request("start", {"command": ["biome", "format"], "name": "format"})
+
+# Continue with other reasoning tasks...
+# Then collect all results when needed
+lint_result = await client.request("logs", {"id": lint_id})
+check_result = await client.request("logs", {"id": check_id})
+format_result = await client.request("logs", {"id": format_id})
+```
 
 ## 10-Second Pitch
 

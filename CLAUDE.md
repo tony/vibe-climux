@@ -9,6 +9,7 @@ Climux is a headless CLI process manager written in Python 3.13+ using only the 
 ## Key Features
 
 - **Implicit Server Start**: Server starts automatically on first command (like tmux)
+- **Parallel Task Execution**: Fire off multiple synchronous tasks in parallel, defer result checking
 - **Command Structure**: Commands like `climux start`, `climux list`, `climux tail`, etc.
 - **Socket Management**: Reuses a default socket unless `-L` or `-S` is explicitly specified
 - **JSON-RPC Control**: Uses JSON-RPC 2.0 over Unix sockets for internal and agentic control
@@ -109,3 +110,36 @@ This is an indication to investigate deeper rather than just apply fixes:
 - **pyproject.toml**: Central configuration for dev dependencies, tools, and project metadata
 - **Strict Type Checking**: mypy configured with strict mode enforcing type safety
 - **Comprehensive Linting**: ruff configured with extensive rule sets for code quality
+
+## Parallel Execution Pattern for AI Agents
+
+Climux enables a powerful pattern for AI agents: **parallel task execution with deferred result collection**. This allows agents to:
+
+1. Fire off multiple analysis/build/test tasks simultaneously
+2. Continue reasoning or performing other work
+3. Collect results when needed
+
+### Example Workflow
+
+```python
+# Start multiple analysis tasks in parallel
+tasks = []
+tasks.append(await client.request("start", {"command": ["ruff", "check", "."], "name": "lint"}))
+tasks.append(await client.request("start", {"command": ["mypy", "."], "name": "typecheck"}))
+tasks.append(await client.request("start", {"command": ["pytest", "-x"], "name": "tests"}))
+
+# Continue with other work while tasks run...
+# For example, analyze the codebase structure, read documentation, etc.
+
+# Later, collect all results
+for task in tasks:
+    logs = await client.request("logs", {"id": task["id"]})
+    # Process results...
+```
+
+### Benefits for AI Workflows
+
+1. **Efficient Time Usage**: Don't block on long-running tasks
+2. **Parallel Investigation**: Run multiple analyses simultaneously
+3. **Context Preservation**: Results are buffered and available when needed
+4. **Natural Workflow**: Matches how developers work - start tasks, do other things, check results
