@@ -8,6 +8,7 @@ Climux is a headless CLI process manager written in Python 3.13+ using only the 
 
 ## Key Features
 
+- **Implicit Server Start**: Server starts automatically on first command (like tmux)
 - **Command Structure**: Commands like `climux start`, `climux list`, `climux tail`, etc.
 - **Socket Management**: Reuses a default socket unless `-L` or `-S` is explicitly specified
 - **JSON-RPC Control**: Uses JSON-RPC 2.0 over Unix sockets for internal and agentic control
@@ -77,6 +78,8 @@ This is an indication to investigate deeper rather than just apply fixes:
 - **tests/**: Comprehensive test suite using pytest and pytest-asyncio
   - **conftest.py**: Test fixtures and utilities for isolated testing
   - **test_climux.py**: Functional tests covering all features
+  - **test_server_lifecycle.py**: Tests for implicit server start and lifecycle management
+  - **test_helpers.py**: Debug utilities for test development
 
 ### Design Principles
 - **Standard Library Only**: No external dependencies in production code
@@ -94,6 +97,13 @@ This is an indication to investigate deeper rather than just apply fixes:
 ### Socket Options
 - `-L socket-name`: Specifies the name of the socket within the default or TMPDIR location
 - `-S socket-path`: Specifies the full path to the socket, overriding the default location
+
+### Server Behavior
+- **Implicit Start**: Server starts automatically when any client command is run
+- **Daemonization**: Server runs as a proper daemon using double-fork pattern
+- **Persistence**: Server continues running after client exits (like tmux)
+- **Single Instance**: Only one server per socket; subsequent commands use existing server
+- **Graceful Handling**: `climux server` command detects if already running
 
 ### Configuration
 - **pyproject.toml**: Central configuration for dev dependencies, tools, and project metadata

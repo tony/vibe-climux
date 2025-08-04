@@ -36,8 +36,7 @@ npm run test:watch
 
 Into this:
 ```bash
-# Start everything with one script
-climux server &
+# Just start using climux - no server setup needed!
 climux start npm run dev --name frontend
 climux start python manage.py runserver --name backend
 climux start docker-compose up postgres --name db
@@ -102,6 +101,7 @@ async def deploy_and_monitor(client: ClimuxClient):
 
 ## Core Features
 
+- **Implicit Server Start**: Like tmux, the server starts automatically when needed
 - **Standard Library Only**: Zero dependencies, works with Python 3.13+
 - **JSON-RPC 2.0**: Structured communication protocol that's LLM-friendly
 - **Full Process Control**: Start, stop, restart, send input, capture output
@@ -132,10 +132,7 @@ async def deploy_and_monitor(client: ClimuxClient):
 # Install development environment
 uv sync --all-extras --dev
 
-# Start the server
-climux server
-
-# In another terminal, start using climux
+# Just start using climux - server starts automatically!
 climux start python -m http.server 8000 --name webserver
 climux list
 climux logs webserver
@@ -149,11 +146,7 @@ climux logs webserver
 Save this as `dev.sh` and never juggle terminals again:
 ```bash
 #!/bin/bash
-# Start climux if not running
-if ! climux ping 2>/dev/null; then
-    climux server &
-    sleep 1
-fi
+# Climux starts automatically - no setup needed!
 
 # Start your entire stack
 climux start npm run dev --name frontend --cwd ./frontend
@@ -346,8 +339,8 @@ async def production_monitor(client: ClimuxClient):
 #### One-Liner Dev Environment
 ```bash
 # Add to your .bashrc/.zshrc
-alias dev='climux server & sleep 1 && climux start npm run dev --name fe && climux start python api.py --name be && climux list'
-alias dev-stop='pkill -f "climux server" && echo "Dev environment stopped"'
+alias dev='climux start npm run dev --name fe && climux start python api.py --name be && climux list'
+alias dev-stop='climux list | grep -o "^[0-9]*" | xargs -I {} climux stop {}'
 alias dev-logs='climux logs $(climux list | fzf | cut -d" " -f1)'
 ```
 
@@ -377,7 +370,7 @@ fi
     {
       "label": "Start Dev Environment",
       "type": "shell",
-      "command": "climux server || true && climux start npm run dev --name frontend",
+      "command": "climux start npm run dev --name frontend",
       "problemMatcher": []
     },
     {
