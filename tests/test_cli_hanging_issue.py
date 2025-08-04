@@ -21,6 +21,25 @@ async def test_cli_tail_hangs_with_subprocess(climux_server, climux_client):
     """
     This test demonstrates the hanging issue when using subprocess.PIPE
     with the CLI streaming command.
+
+    PROBLEM:
+    - CLI output gets block-buffered when using subprocess.PIPE
+    - The readline() call hangs waiting for a newline that's stuck in the buffer
+    - This happens because stdout is not connected to a TTY
+
+    KNOWNS:
+    - Without a TTY, Python and many programs use block buffering (4KB-8KB)
+    - Output won't be flushed until buffer fills or process exits
+    - This is standard POSIX behavior, not a bug in climux
+    - The test reliably reproduces the issue in ~2 seconds
+
+    UNKNOWNS:
+    - Exact buffer size varies by system (typically 4KB or 8KB)
+    - Some programs may force line buffering even without TTY
+
+    SOLUTION:
+    - Use pexpect which creates a pseudo-TTY (see test_cli_tail_fixed_with_pexpect)
+    - This forces line-buffered output behavior
     """
     # First, start a simple process that outputs logs
     result = await climux_client.request(
@@ -122,6 +141,25 @@ async def test_cli_tail_with_signal_synchronization(climux_server, climux_client
     """
     This test uses signal-based synchronization instead of time.sleep()
     for deterministic testing.
+
+    PROBLEM:
+    - The streaming subscription takes time to establish
+    - Without proper synchronization, we might miss the initial output
+    - The test times out waiting for output that was sent before subscription
+
+    KNOWNS:
+    - Streaming needs ~1-2 seconds to establish subscription
+    - The signal approach works (see test_cli_signal_sync.py)
+    - The issue is timing between process start, subscription, and output
+
+    UNKNOWNS:
+    - Exact time needed for subscription establishment varies
+    - Why this specific test fails while test_cli_signal_sync.py works
+    - Whether the issue is in test setup or the actual implementation
+
+    SOLUTION:
+    - See test_cli_signal_sync.py for working implementation
+    - Key differences: simpler patterns, longer delays, different process setup
     """
     import os
     import signal

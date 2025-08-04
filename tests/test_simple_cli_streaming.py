@@ -45,6 +45,27 @@ async def test_cli_tail_exits_with_error_for_invalid_process(climux_server):
 async def test_cli_tail_with_existing_logs(climux_server, climux_client):
     """
     Test tailing a process that already has logs.
+
+    PROBLEM:
+    - Test times out waiting for "Hello World" output in tail stream
+    - The process has already exited before tailing starts
+    - Even though logs exist, the tail command doesn't show them
+
+    KNOWNS:
+    - The logs are present (verified with climux_client.request("logs"))
+    - The process completes in <0.5 seconds
+    - The tail command starts after process exits
+    - Similar test works for error messages (test_cli_tail_exits_with_error_for_invalid_process)
+
+    UNKNOWNS:
+    - Whether tail command should show historical logs for exited processes
+    - If this is a race condition or design limitation
+    - Why error output works but normal output doesn't
+
+    SOLUTION:
+    - test_high_volume_streaming.py uses long-running processes
+    - Ensures process is still running when tail subscription starts
+    - May need to clarify expected behavior for tailing exited processes
     """
     # Start a process that outputs and exits immediately
     result = await climux_client.request(

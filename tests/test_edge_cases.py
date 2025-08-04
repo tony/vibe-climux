@@ -258,7 +258,31 @@ class TestProcessCleanup:
     async def test_orphaned_process_cleanup(
         self, server_controller, unique_socket_path: Path
     ):
-        """Test that orphaned processes are cleaned up on server restart."""
+        """Test that orphaned processes are cleaned up on server restart.
+
+        PROBLEM:
+        - When server crashes/is killed, processes become orphaned
+        - PID journal cleanup only happens on graceful shutdown
+        - Test expects orphaned processes to be cleaned on restart
+
+        KNOWNS:
+        - PID journal is written to /tmp/climux_{socket_name}_pids.json
+        - Contains mapping of PIDs to process info
+        - Server reads journal on startup
+        - Cleanup code exists but may not run in all scenarios
+
+        UNKNOWNS:
+        - Whether test setup properly simulates a crash
+        - If cleanup code is reached during abrupt termination
+        - Race conditions between SIGTERM and cleanup
+        - Whether OS reaps orphaned processes before cleanup
+
+        SOLUTION:
+        - May need to use SIGKILL instead of SIGTERM to simulate crash
+        - Could add explicit cleanup on startup (before journal read)
+        - Consider using atexit handlers for more reliable cleanup
+        - Test may need adjustment to match actual implementation
+        """
         # Start a long-running process
         returncode, stdout, stderr = server_controller.run_client_command(
             ["start", "sleep", "300", "--name", "orphan-test"]

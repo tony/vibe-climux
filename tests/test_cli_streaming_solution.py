@@ -6,6 +6,27 @@ a pseudo-TTY which forces line-buffered output.
 
 NOTE: These tests have timing issues. See test_high_volume_streaming.py and
 test_cli_signal_sync.py for working implementations.
+
+PROBLEM:
+- All tests in this file timeout waiting for expected output
+- The streaming subscription doesn't establish quickly enough
+- Output is generated before the tail command can capture it
+
+KNOWNS:
+- The streaming functionality works (proven in other test files)
+- Adding delays helps but doesn't fully solve the issue
+- The same functionality passes in test_high_volume_streaming.py
+- Issue is specific to rapid output immediately after process start
+
+UNKNOWNS:
+- Why these tests fail while similar ones in test_high_volume_streaming.py pass
+- Whether the issue is test design or a race condition in the implementation
+- Optimal delay needed between process start and tail subscription
+
+SOLUTION:
+- test_high_volume_streaming.py adds 2-second delays before output starts
+- test_cli_signal_sync.py uses signals to control output timing
+- Both approaches ensure subscription is established before output begins
 """
 
 import pytest

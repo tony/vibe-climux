@@ -219,7 +219,30 @@ class TestServerAttachment:
     @pytest.mark.skip(reason="Attachment feature not yet implemented")
     @pytest.mark.asyncio
     async def test_server_attach_shows_dashboard(self, server_controller):
-        """Test that 'climux' or 'climux attach' shows live dashboard."""
+        """Test that 'climux' or 'climux attach' shows live dashboard.
+
+        PROBLEM:
+        - Feature not implemented yet
+        - Would require interactive terminal UI (like tmux)
+        - Need to design dashboard layout and controls
+
+        KNOWNS:
+        - Similar to 'tmux attach' behavior
+        - Should show all running processes
+        - Should update in real-time
+        - Should be detachable with key sequence (e.g., Ctrl-B D)
+
+        UNKNOWNS:
+        - UI library to use (curses, rich, etc.) vs staying dependency-free
+        - How to handle terminal resizing
+        - Key bindings and navigation
+        - Whether to support multiple attached clients
+
+        SOLUTION:
+        - Future feature - not blocking current functionality
+        - Consider using Python's curses module (stdlib)
+        - Study tmux's approach to terminal handling
+        """
         # Start some processes
         server_controller.run_client_command(
             ["start", "python", "-c", "import time; time.sleep(30)", "--name", "test"]
@@ -235,7 +258,30 @@ class TestServerAttachment:
     @pytest.mark.skip(reason="Detach feature not yet implemented")
     @pytest.mark.asyncio
     async def test_server_detach_leaves_running(self, server_controller):
-        """Test that detaching leaves server running."""
+        """Test that detaching leaves server running.
+
+        PROBLEM:
+        - Feature not implemented yet
+        - Need to handle interactive terminal detachment
+        - Must ensure server and processes continue running
+
+        KNOWNS:
+        - Similar to tmux detach (Ctrl-B D)
+        - Server should not stop when client detaches
+        - All processes should continue running
+        - Client should be able to re-attach later
+
+        UNKNOWNS:
+        - Best key sequence for detachment
+        - How to handle detach during active streaming
+        - Whether to support forced detach vs graceful detach
+        - How to communicate detach status to user
+
+        SOLUTION:
+        - Future feature - depends on attach implementation
+        - Could use signal handling (SIGHUP) for detach
+        - Need to ensure clean socket disconnection
+        """
         # This would test Ctrl+C or 'detach' command behavior
         pass
 
