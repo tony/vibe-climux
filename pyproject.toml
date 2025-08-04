@@ -92,6 +92,11 @@ markers = [
 ]
 # Ensure test isolation
 tmp_path_retention_policy = "failed"  # Keep tmp dirs only for failed tests
+# Suppress benign warnings
+filterwarnings = [
+    # Python 3.13 forkpty warning - benign for our short-lived tests
+    "ignore:.*multi-threaded.*forkpty.*:DeprecationWarning",
+]
 
 [tool.pytest-watcher]
 now = true
