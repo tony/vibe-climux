@@ -1,8 +1,21 @@
-# Real-Time Log Streaming Implementation Plan
+# CLI Streaming Test Implementation Plan
+
+## Overview
+
+This plan addresses the CLI streaming test issues discovered when testing `climux logs --tail`. The core problem is pipe buffering causing tests to hang, which we've solved with pexpect. However, expert analysis revealed several improvements we should implement.
+
+## Current Status
+
+- ✅ Basic pexpect test working (test_cli_hanging_issue.py)
+- ⚠️ Getting forkpty() deprecation warning in Python 3.13
+- ⚠️ Using time.sleep(1) for synchronization (fragile)
+- ⚠️ BrokenPipeError cluttering CI logs
+- ❌ No high-volume streaming tests
+- ❌ No PTY usage monitoring
 
 ## Expert Consensus Summary
 
-After analyzing recommendations from 4 experts, there's strong consensus on the architecture:
+After analyzing recommendations from 4 experts on CLI streaming tests:
 
 ### Core Architecture
 1. **JSON-RPC Notifications** for streaming (messages without `id` field)

@@ -492,3 +492,49 @@ The streaming architecture follows the expert consensus exactly:
 - The fix for short-lived processes ensures no log loss
 
 Current state: Server fully supports streaming, needs CLI client integration.
+
+## CLI Streaming Test Strategy (2025-08-04)
+
+### Expert Consensus on Testing Approach
+
+After researching 4 expert opinions on CLI streaming tests with pexpect, the consensus is:
+
+1. **The forkpty() warning is mostly benign** for short-lived tests (<5s)
+   - Python 3.13 added this warning, but actual deadlocks are rare
+   - Can safely suppress the warning for now
+   - Plan migration to Shellous before Python 3.14 (when it may become an error)
+
+2. **Signal-based synchronization** eliminates timing dependencies
+   - Instead of `time.sleep(1)`, use SIGUSR1 to trigger output
+   - Process waits for signal before printing, ensuring tail is ready
+   - Makes tests deterministic and faster
+
+3. **High-volume testing needs efficient capture**
+   - Use subprocess with unbuffered mode instead of pexpect for bulk data
+   - Collect all output first, then verify (don't assert line-by-line)
+   - Use numbered sequences (P00-0001) to detect drops/reordering
+
+4. **BrokenPipeError is normal** when clients disconnect
+   - Server should catch and suppress, not log stack traces
+   - This is expected behavior, not an error
+
+5. **PTY limits are not a concern** at current scale
+   - With 2 workers and 50+ tests, using ~2 PTYs max concurrently
+   - Linux default is 256+ PTYs, we're nowhere near the limit
+   - Add monitoring to detect leaks early
+
+### Implementation Plan
+
+1. **Immediate Actions**
+   - Suppress forkpty warning in test config
+   - Implement signal-based test synchronization
+   - Fix server to handle BrokenPipeError gracefully
+
+2. **Test Improvements**
+   - Create high-volume streaming test with 20+ processes
+   - Add PTY usage monitoring fixture
+   - Use subprocess for bulk capture, pexpect for interactive
+
+3. **Future Migration**
+   - Schedule Shellous evaluation for Python 3.14 compatibility
+   - Consider transport abstraction pattern from expert recommendations
