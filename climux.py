@@ -284,11 +284,17 @@ class ClimuxServer:
         self.next_id = 1
         self._server: asyncio.Server | None = None
         self._running = False
+        self._streaming_manager = None  # Lazy init after processes dict is ready
 
     async def start(self) -> None:
         """Start the server."""
         # Ensure socket directory exists
         self.socket_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Initialize streaming manager
+        from streaming import StreamingManager
+
+        self._streaming_manager = StreamingManager(self.processes)
 
         # Clean up stale PIDs from previous runs
         await self._cleanup_stale_pids()
@@ -355,7 +361,7 @@ class ClimuxServer:
 
                 try:
                     request = json.loads(data.decode())
-                    response = await self._dispatch_request(request)
+                    response = await self._dispatch_request(request, writer)
                 except json.JSONDecodeError as e:
                     response = self._error_response(-32700, f"Parse error: {e}", None)
                 except Exception as e:
@@ -371,10 +377,15 @@ class ClimuxServer:
         except Exception:
             pass  # Client disconnected
         finally:
+            # Clean up any streaming subscriptions for this client
+            if self._streaming_manager:
+                await self._streaming_manager.cleanup_writer(writer)
             writer.close()
             await writer.wait_closed()
 
-    async def _dispatch_request(self, request: dict[str, Any]) -> dict[str, Any]:
+    async def _dispatch_request(
+        self, request: dict[str, Any], writer: asyncio.StreamWriter
+    ) -> dict[str, Any]:
         """Dispatch a JSON-RPC request."""
         method = request.get("method")
         params = request.get("params", {})
@@ -390,6 +401,8 @@ class ClimuxServer:
             "tail": self._handle_tail,
             "snapshot": self._handle_snapshot,
             "ping": self._handle_ping,
+            "log.subscribe": self._handle_subscribe,
+            "log.unsubscribe": self._handle_unsubscribe,
         }
 
         handler = handlers.get(method)
@@ -397,7 +410,11 @@ class ClimuxServer:
             return self._error_response(-32601, f"Method not found: {method}", req_id)
 
         try:
-            result = await handler(params)
+            # Special handling for subscribe which needs the writer
+            if method == "log.subscribe":
+                result = await handler(params, writer)
+            else:
+                result = await handler(params)
             return {"jsonrpc": "2.0", "result": result, "id": req_id}
         except Exception as e:
             return self._error_response(-32000, str(e), req_id)
@@ -504,6 +521,42 @@ class ClimuxServer:
     async def _handle_ping(self, params: dict[str, Any]) -> str:
         """Ping the server."""
         return "pong"
+
+    async def _handle_subscribe(
+        self, params: dict[str, Any], writer: asyncio.StreamWriter
+    ) -> dict[str, Any]:
+        """Subscribe to real-time logs from processes."""
+        process_ids = params.get("process_ids", [])
+        if not process_ids:
+            raise ValueError("process_ids required")
+
+        if not self._streaming_manager:
+            raise RuntimeError("Streaming not available")
+
+        # Validate process IDs exist
+        for pid in process_ids:
+            if pid not in self.processes:
+                raise ValueError(f"Process {pid} not found")
+
+        # Create subscription
+        subscription_id = await self._streaming_manager.subscribe(process_ids, writer)
+
+        return {"subscription_id": subscription_id, "process_ids": process_ids}
+
+    async def _handle_unsubscribe(self, params: dict[str, Any]) -> bool:
+        """Unsubscribe from log streaming."""
+        subscription_id = params.get("subscription_id")
+        if not subscription_id:
+            raise ValueError("subscription_id required")
+
+        if not self._streaming_manager:
+            raise RuntimeError("Streaming not available")
+
+        success = await self._streaming_manager.unsubscribe(subscription_id)
+        if not success:
+            raise ValueError(f"Subscription {subscription_id} not found")
+
+        return True
 
     # --- Helper methods ---
 
