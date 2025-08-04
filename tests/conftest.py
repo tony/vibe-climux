@@ -12,10 +12,13 @@ These fixtures provide:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import signal
+import subprocess
 import sys
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from typing import Any
 
@@ -297,3 +300,233 @@ def pytest_configure(config):
     )
     config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line("markers", "stress: marks tests as stress tests")
+
+
+# Enhanced fixtures for server lifecycle testing
+
+
+@pytest_asyncio.fixture
+async def managed_server(
+    unique_socket_path: Path,
+) -> AsyncGenerator[dict[str, Any], None]:
+    """
+    Advanced fixture for testing server lifecycle management.
+
+    Provides fine-grained control over server state and lifecycle,
+    including the ability to start/stop server and verify state.
+
+    Yields a dict with:
+        - socket_path: Path to the socket
+        - start_server: Coroutine to start server
+        - stop_server: Coroutine to stop server
+        - is_running: Function to check if server is running
+        - get_server: Function to get server instance (if running)
+    """
+    server: ClimuxServer | None = None
+    server_task: asyncio.Task[None] | None = None
+
+    async def start_server() -> ClimuxServer:
+        nonlocal server, server_task
+        if server is not None:
+            raise RuntimeError("Server already running")
+
+        server = ClimuxServer(unique_socket_path)
+        server_task = asyncio.create_task(server.start())
+
+        # Wait for socket
+        for _ in range(40):
+            if unique_socket_path.exists():
+                break
+            await asyncio.sleep(0.05)
+        else:
+            server_task.cancel()
+            raise RuntimeError("Server failed to start")
+
+        return server
+
+    async def stop_server() -> None:
+        nonlocal server, server_task
+        if server is None:
+            return
+
+        await server.shutdown()
+        if server_task:
+            server_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await server_task
+
+        server = None
+        server_task = None
+
+    def is_running() -> bool:
+        return server is not None and unique_socket_path.exists()
+
+    def get_server() -> ClimuxServer | None:
+        return server
+
+    try:
+        yield {
+            "socket_path": unique_socket_path,
+            "start_server": start_server,
+            "stop_server": stop_server,
+            "is_running": is_running,
+            "get_server": get_server,
+        }
+    finally:
+        # Cleanup any running server
+        await stop_server()
+
+
+class ServerController:
+    """Test utility for controlling server lifecycle in tests."""
+
+    def __init__(self, socket_path: Path):
+        self.socket_path = socket_path
+        self.process: subprocess.Popen[bytes] | None = None
+
+    def start_server_subprocess(
+        self, args: list[str] | None = None
+    ) -> subprocess.Popen[bytes]:
+        """Start server as a real subprocess (like a user would)."""
+        if args is None:
+            args = []
+
+        cmd = [
+            sys.executable,
+            "climux.py",
+            "-S",
+            str(self.socket_path),
+            "server",
+        ] + args
+        self.process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=Path(__file__).parent.parent,  # Project root
+        )
+
+        # Wait for socket to appear
+        for _ in range(50):
+            if self.socket_path.exists():
+                break
+            time.sleep(0.1)
+        else:
+            self.stop_server_subprocess()
+            raise RuntimeError("Server subprocess failed to create socket")
+
+        return self.process
+
+    def stop_server_subprocess(self) -> None:
+        """Stop the server subprocess."""
+        if self.process:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+            self.process = None
+
+    def run_client_command(self, args: list[str]) -> tuple[int, str, str]:
+        """Run a client command against the server."""
+        cmd = [sys.executable, "climux.py", "-S", str(self.socket_path)] + args
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent.parent,
+        )
+        return result.returncode, result.stdout, result.stderr
+
+    def is_server_running(self) -> bool:
+        """Check if server process is running."""
+        return self.process is not None and self.process.poll() is None
+
+
+@pytest.fixture
+def server_controller(
+    unique_socket_path: Path,
+) -> Generator[ServerController, None, None]:
+    """
+    Fixture providing a ServerController for subprocess-based testing.
+
+    This allows testing the real CLI behavior including implicit server start.
+    """
+    controller = ServerController(unique_socket_path)
+    try:
+        yield controller
+    finally:
+        controller.stop_server_subprocess()
+        # Clean up socket if left behind
+        if unique_socket_path.exists():
+            unique_socket_path.unlink()
+
+
+@pytest.fixture
+def cli_runner(unique_socket_path: Path) -> Generator[Any, None, None]:
+    """
+    Fixture for running CLI commands with automatic server management.
+
+    This simulates real user behavior where server might start implicitly.
+    """
+    processes: list[subprocess.Popen[bytes]] = []
+
+    def run(args: list[str], check_server: bool = True) -> tuple[int, str, str]:
+        """Run a climux command."""
+        cmd = [sys.executable, "climux.py", "-S", str(unique_socket_path)] + args
+
+        # Check if this might start a server
+        if check_server and args and args[0] != "server":
+            # Give any implicit server time to start
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=Path(__file__).parent.parent,
+            )
+
+            # Track any server that might have been started
+            if unique_socket_path.exists():
+                # Server was started implicitly
+                pass
+        else:
+            # For explicit server start, use Popen
+            if args and args[0] == "server":
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    cwd=Path(__file__).parent.parent,
+                )
+                processes.append(proc)
+                # Wait for socket
+                for _ in range(50):
+                    if unique_socket_path.exists():
+                        break
+                    time.sleep(0.1)
+                return 0, "", ""
+            else:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    cwd=Path(__file__).parent.parent,
+                )
+
+        return result.returncode, result.stdout, result.stderr
+
+    try:
+        yield run
+    finally:
+        # Cleanup any processes
+        for proc in processes:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+
+        # Clean up socket
+        if unique_socket_path.exists():
+            unique_socket_path.unlink()

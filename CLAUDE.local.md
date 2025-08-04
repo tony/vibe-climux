@@ -45,16 +45,38 @@ climux start npm run dev  # Server starts automatically if needed
 #### Test Status
 - ✅ Enhanced test fixtures for server lifecycle control
 - ✅ Socket state verification utilities  
-- ✅ Tests for implicit server start behavior (failing as expected)
-- 🚧 Implement implicit server start in climux.py
+- ✅ Tests for implicit server start behavior (all passing!)
+- ✅ Implemented implicit server start in climux.py
 - ⏳ Server attachment/detachment tests (future feature)
 
-#### Next Steps
-1. Fix the bug in client command handling (line 676)
-2. Add server existence check in client
-3. Implement automatic server spawning
-4. Make server command daemonize properly
-5. Verify all tests pass
+#### Implementation Complete! 🎉
+
+Successfully implemented tmux-like implicit server start:
+
+1. **Fixed the bug**: Changed `args.command` to `args.subcommand` (argparse naming collision)
+2. **Added server checks**: `is_server_running()` function that verifies socket exists and server responds to ping
+3. **Automatic spawning**: `start_server_daemon()` uses double-fork pattern for proper daemonization
+4. **Client integration**: All client commands now check for server and start it if needed
+5. **All tests passing**: Both server lifecycle tests and main test suite are green
+
+The implementation provides:
+- Server starts automatically on first client command
+- Server persists after client exits
+- Multiple servers supported via -L and -S options
+- Proper cleanup of stale sockets and PIDs
+- Graceful handling of socket conflicts
+
+#### What Changed
+1. **climux.py**:
+   - Added `is_server_running(socket_path)` - checks if server is alive
+   - Added `start_server_daemon(socket_path)` - double-fork daemonization
+   - Modified `main()` to auto-start server for client commands
+   - Server command now checks if already running
+
+2. **Behavior**:
+   - `climux start npm run dev` now just works (no manual server start)
+   - `climux server` detects if already running and exits gracefully
+   - Server runs as proper daemon (detached from terminal)
 
 ### Original Task Context
 User wanted to set up a file watcher with `entr` and `uv run mypy`, which revealed that the current climux UX requires manual server management. This led to the realization that climux should behave more like tmux with implicit server instantiation.

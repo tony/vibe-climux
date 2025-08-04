@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import os
 import signal
@@ -103,9 +104,13 @@ class ManagedProcess:
             self.exit_code = None
 
             # Start log handlers
-            asyncio.create_task(self._read_stream(self.process.stdout, "stdout"))
-            asyncio.create_task(self._read_stream(self.process.stderr, "stderr"))
-            asyncio.create_task(self._monitor_exit())
+            self._stdout_task = asyncio.create_task(
+                self._read_stream(self.process.stdout, "stdout")
+            )
+            self._stderr_task = asyncio.create_task(
+                self._read_stream(self.process.stderr, "stderr")
+            )
+            self._monitor_task = asyncio.create_task(self._monitor_exit())
 
             self._add_log("system", f"Process started with PID {self.pid}")
             return True
@@ -220,10 +225,8 @@ class ManagedProcess:
 
         # Notify watchers
         for queue in self._log_watchers:
-            try:
+            with contextlib.suppress(asyncio.QueueFull):
                 queue.put_nowait(entry)
-            except asyncio.QueueFull:
-                pass
 
     async def _read_stream(
         self, stream: asyncio.StreamReader | None, source: str
@@ -255,10 +258,8 @@ class ManagedProcess:
 
         # Notify watchers that stream ended
         for queue in self._log_watchers:
-            try:
+            with contextlib.suppress(asyncio.QueueFull):
                 queue.put_nowait(None)
-            except asyncio.QueueFull:
-                pass
         self._log_watchers.clear()
 
 
@@ -578,6 +579,57 @@ class ClimuxClient:
 
 
 # --- CLI ---
+def is_server_running(socket_path: Path) -> bool:
+    """Check if a server is running at the given socket path."""
+    if not socket_path.exists():
+        return False
+
+    # Try to connect and ping
+    try:
+        client = ClimuxClient(socket_path)
+        result = asyncio.run(client.request("ping"))
+        return result == "pong"
+    except (RuntimeError, ConnectionRefusedError, FileNotFoundError):
+        # Socket exists but server not responding - stale socket
+        return False
+
+
+def start_server_daemon(socket_path: Path) -> None:
+    """Fork and start a server daemon."""
+    import time
+
+    # Double fork to properly daemonize
+    pid = os.fork()
+    if pid > 0:
+        # Parent process - wait for child to fork again
+        os.waitpid(pid, 0)
+        # Give the server time to start
+        for _ in range(20):
+            if is_server_running(socket_path):
+                return
+            time.sleep(0.1)
+        return
+
+    # First child - fork again and exit
+    os.setsid()  # Create new session
+    pid = os.fork()
+    if pid > 0:
+        # First child exits
+        os._exit(0)
+
+    # Second child (daemon) - start server
+    # Redirect stdin/stdout/stderr to devnull
+    devnull = os.open(os.devnull, os.O_RDWR)
+    os.dup2(devnull, 0)  # stdin
+    os.dup2(devnull, 1)  # stdout
+    os.dup2(devnull, 2)  # stderr
+    os.close(devnull)
+
+    # Start the server
+    server = ClimuxServer(socket_path)
+    asyncio.run(server.start())
+
+
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -596,7 +648,7 @@ def main() -> None:
         help="Full path to socket",
     )
 
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="subcommand", required=True)
 
     # Server command
     subparsers.add_parser("server", help="Start the climux server")
@@ -662,16 +714,29 @@ def main() -> None:
         socket_path = SOCKET_DIR / args.socket_name
 
     # Handle commands
-    if args.command == "server":
+    if args.subcommand == "server":
+        # Check if server is already running
+        if is_server_running(socket_path):
+            print(f"Server already running at {socket_path}")
+            sys.exit(0)
+        # Start server in foreground
         server = ClimuxServer(socket_path)
         asyncio.run(server.start())
 
     else:
-        # Client commands
+        # Client commands - ensure server is running
+        if not is_server_running(socket_path):
+            # Start server daemon automatically
+            start_server_daemon(socket_path)
+            # Brief pause to ensure server is ready
+            if not is_server_running(socket_path):
+                print(f"Failed to start server at {socket_path}", file=sys.stderr)
+                sys.exit(1)
+
         client = ClimuxClient(socket_path)
 
         async def run_client():
-            if args.command == "start":
+            if args.subcommand == "start":
                 params = {
                     "command": args.command,
                     "name": args.name,
@@ -683,7 +748,7 @@ def main() -> None:
                 result = await client.request("start", params)
                 print(f"Started process {result['id']}: {result['name']}")
 
-            elif args.command == "list":
+            elif args.subcommand == "list":
                 result = await client.request("list")
                 if not result:
                     print("No processes running")
@@ -694,21 +759,21 @@ def main() -> None:
                             f"(PID: {proc['pid'] or 'N/A'})"
                         )
 
-            elif args.command == "stop":
+            elif args.subcommand == "stop":
                 result = await client.request("stop", {"id": args.id})
                 print(f"Stopped process {result['id']}")
 
-            elif args.command == "restart":
+            elif args.subcommand == "restart":
                 result = await client.request("restart", {"id": args.id})
                 print(f"Restarted process {result['id']}: {result['name']}")
 
-            elif args.command == "send":
+            elif args.subcommand == "send":
                 result = await client.request(
                     "send", {"id": args.id, "data": args.data}
                 )
                 print(f"Sent input to process {result['id']}")
 
-            elif args.command == "logs":
+            elif args.subcommand == "logs":
                 params = {"id": args.id}
                 if args.lines:
                     params["lines"] = args.lines
@@ -718,21 +783,21 @@ def main() -> None:
                         f"[{entry['timestamp']}] [{entry['source']}] {entry['content']}"
                     )
 
-            elif args.command == "tail":
+            elif args.subcommand == "tail":
                 result = await client.request("tail", {"id": args.id})
                 for entry in result:
                     print(
                         f"[{entry['timestamp']}] [{entry['source']}] {entry['content']}"
                     )
 
-            elif args.command == "snapshot":
+            elif args.subcommand == "snapshot":
                 result = await client.request(
                     "snapshot", {"id": args.id, "lines": args.lines}
                 )
                 for entry in result:
                     print(entry["content"])
 
-            elif args.command == "ping":
+            elif args.subcommand == "ping":
                 result = await client.request("ping")
                 print(result)
 
