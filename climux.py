@@ -18,6 +18,7 @@ import signal
 import sys
 import tempfile
 from collections import deque
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -638,6 +639,71 @@ class ClimuxClient:
 
         return response.get("result")
 
+    async def subscribe_logs(
+        self, process_ids: list[int]
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Subscribe to real-time logs from processes."""
+        try:
+            reader, writer = await asyncio.open_unix_connection(str(self.socket_path))
+        except (FileNotFoundError, ConnectionRefusedError):
+            raise RuntimeError(f"Cannot connect to server at {self.socket_path}")
+
+        try:
+            # Send subscribe request
+            request = {
+                "jsonrpc": "2.0",
+                "method": "log.subscribe",
+                "params": {"process_ids": process_ids},
+                "id": 1,
+            }
+            writer.write(json.dumps(request).encode() + b"\n")
+            await writer.drain()
+
+            # Read subscribe response
+            response_data = await reader.readline()
+            if not response_data:
+                raise RuntimeError("Empty response from server")
+
+            response = json.loads(response_data.decode())
+            if "error" in response:
+                raise RuntimeError(f"Server error: {response['error']['message']}")
+
+            subscription_id = response["result"]["subscription_id"]
+
+            # Read streaming notifications
+            while True:
+                try:
+                    line = await reader.readline()
+                    if not line:
+                        break
+
+                    msg = json.loads(line.decode())
+
+                    # Check if it's a log entry notification
+                    if msg.get("method") == "log.entry" and "id" not in msg:
+                        yield msg["params"]["entry"]
+                    elif msg.get("method") == "log.complete":
+                        # Subscription ended
+                        break
+
+                except json.JSONDecodeError:
+                    continue
+                except asyncio.CancelledError:
+                    # Send unsubscribe before exiting
+                    unsub_request = {
+                        "jsonrpc": "2.0",
+                        "method": "log.unsubscribe",
+                        "params": {"subscription_id": subscription_id},
+                        "id": 2,
+                    }
+                    writer.write(json.dumps(unsub_request).encode() + b"\n")
+                    await writer.drain()
+                    raise
+
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
 
 # --- CLI ---
 def is_server_running(socket_path: Path) -> bool:
@@ -748,6 +814,9 @@ def main() -> None:
     logs_parser = subparsers.add_parser("logs", help="Show process logs")
     logs_parser.add_argument("id", type=int, help="Process ID")
     logs_parser.add_argument("--lines", type=int, help="Number of lines to show")
+    logs_parser.add_argument(
+        "--tail", "-f", action="store_true", help="Follow log output in real-time"
+    )
 
     tail_parser = subparsers.add_parser("tail", help="Tail process logs")
     tail_parser.add_argument("id", type=int, help="Process ID")
@@ -835,14 +904,25 @@ def main() -> None:
                 print(f"Sent input to process {result['id']}")
 
             elif args.subcommand == "logs":
-                params = {"id": args.id}
-                if args.lines:
-                    params["lines"] = args.lines
-                result = await client.request("logs", params)
-                for entry in result:
-                    print(
-                        f"[{entry['timestamp']}] [{entry['source']}] {entry['content']}"
-                    )
+                if args.tail:
+                    # Real-time streaming mode
+                    try:
+                        async for entry in client.subscribe_logs([args.id]):
+                            print(
+                                f"[{entry['timestamp']}] [{entry['source']}] {entry['content']}"
+                            )
+                    except KeyboardInterrupt:
+                        print("\nStopped tailing logs")
+                else:
+                    # Normal logs mode
+                    params = {"id": args.id}
+                    if args.lines:
+                        params["lines"] = args.lines
+                    result = await client.request("logs", params)
+                    for entry in result:
+                        print(
+                            f"[{entry['timestamp']}] [{entry['source']}] {entry['content']}"
+                        )
 
             elif args.subcommand == "tail":
                 result = await client.request("tail", {"id": args.id})
@@ -864,6 +944,9 @@ def main() -> None:
 
         try:
             asyncio.run(run_client())
+        except KeyboardInterrupt:
+            # Clean exit on Ctrl+C
+            sys.exit(0)
         except RuntimeError as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
