@@ -26,8 +26,8 @@ async def test_high_volume_streaming(climux_server, climux_client):
                 "-u",
                 "-c",
                 """import time
-# Wait a bit before starting
-time.sleep(2)
+# Small delay to ensure subscription is ready
+time.sleep(0.5)
 
 # Output 100 lines rapidly
 for i in range(100):
@@ -109,8 +109,8 @@ async def test_burst_output_streaming(climux_server, climux_client):
                 "-c",
                 """import time
 
-# Wait before starting
-time.sleep(2)
+# Small delay before starting
+time.sleep(0.5)
 
 # Burst 1: 50 lines instantly
 print('BURST 1 START', flush=True)
@@ -186,7 +186,7 @@ async def test_multiple_simultaneous_streams(climux_server, climux_client):
                 "-u",
                 "-c",
                 """import time
-time.sleep(2)  # Wait before starting
+time.sleep(0.5)  # Small delay before starting
 for i in range(10):
     print(f'Process 1 message {i}', flush=True)
     time.sleep(0.2)
@@ -205,7 +205,7 @@ print('PROCESS 1 DONE', flush=True)
                 "-u",
                 "-c",
                 """import time
-time.sleep(2)  # Wait before starting
+time.sleep(0.5)  # Small delay before starting
 for i in range(10):
     print(f'Process 2 message {i}', flush=True)
     time.sleep(0.2)

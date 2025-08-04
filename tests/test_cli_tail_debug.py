@@ -25,7 +25,7 @@ async def test_cli_tail_basic_debug(climux_server, climux_client):
                 "python",
                 "-u",
                 "-c",
-                "import time; print('Starting', flush=True); time.sleep(10)",
+                "import time; print('Starting', flush=True); time.sleep(2); print('Still running', flush=True); time.sleep(1)",
             ],
             "name": "debug_test",
         },
