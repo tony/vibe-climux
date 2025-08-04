@@ -1,45 +1,104 @@
 # Climux
 
-A headless CLI process manager for local development and AI/agent workflows. Think of it as tmux for background processes - no GUI, just JSON-RPC control.
+A headless CLI process manager that bridges the gap between human developers and AI agents. Run background processes with the simplicity of `tmux` but with JSON-RPC control that AI can understand.
+
+## The Problem Climux Solves
+
+**For Developers:** You're juggling 5+ terminal windows - frontend, backend, database, tests, and logs. Alt-tabbing constantly. Losing track of what's running where. Missing important error messages in the chaos.
+
+**For AI Agents:** Current tools aren't built for programmatic control. Agents struggle with terminal emulators, can't reliably parse unstructured output, and have no way to manage long-running processes.
+
+**Climux:** One tool that works perfectly for both humans and machines.
 
 ## Why Climux?
 
-### For Local Development
-Replace multiple terminal windows with a single process manager:
-```bash
-# Instead of 5 terminal tabs, use one climux server
-climux server &
+### 🚀 For Local Development
 
-# Start all your services
+Transform this common scenario:
+```bash
+# Terminal 1: Frontend
+npm run dev
+
+# Terminal 2: Backend  
+python manage.py runserver
+
+# Terminal 3: Database
+docker-compose up postgres
+
+# Terminal 4: Redis
+redis-server
+
+# Terminal 5: Tests
+npm run test:watch
+
+# Terminal 6: Where did that error come from?!
+```
+
+Into this:
+```bash
+# Start everything with one script
+climux server &
 climux start npm run dev --name frontend
-climux start python api.py --name backend  
-climux start docker-compose up db --name database
+climux start python manage.py runserver --name backend
+climux start docker-compose up postgres --name db
+climux start redis-server --name redis
 climux start npm run test:watch --name tests
 
-# Monitor everything from one place
-climux list
-climux tail backend
-climux logs frontend --lines 50
+# Now you have superpowers
+climux list                    # What's running?
+climux tail backend            # Watch backend logs
+climux logs frontend --lines 50 # What just happened?
+climux restart backend         # Quick restart
+climux send tests "r\n"        # Re-run tests
 ```
 
-### For AI/Agent Workflows
-Climux provides structured, parseable control perfect for LLMs and agents:
+**Benefits:**
+- 📊 Single dashboard for all processes
+- 🔍 Never lose important logs
+- ⚡ Instant access to any process
+- 🔄 Easy restarts without finding the right terminal
+- 📝 Searchable history across all processes
+
+### 🤖 For AI/Agent Workflows
+
+Climux speaks JSON-RPC, making it the perfect bridge between AI and system processes:
+
 ```python
-# Agents can manage processes programmatically
-client = ClimuxClient(socket_path)
-
-# Start a long-running process
-result = await client.request("start", {
-    "command": ["python", "train_model.py"],
-    "name": "model-training"
-})
-
-# Monitor progress
-logs = await client.request("logs", {"id": result["id"], "lines": 10})
-
-# Send commands
-await client.request("send", {"id": result["id"], "data": "stop\n"})
+# AI agents can now control processes like a senior developer
+async def deploy_and_monitor(client: ClimuxClient):
+    # Start the deployment
+    deploy = await client.request("start", {
+        "command": ["./deploy.sh", "production"],
+        "name": "deployment"
+    })
+    
+    # Watch for completion or errors
+    while True:
+        logs = await client.request("logs", {
+            "id": deploy["id"], 
+            "lines": 10
+        })
+        
+        # AI can understand structured output
+        for log in logs:
+            if "ERROR" in log["content"]:
+                # Intelligent error handling
+                await handle_deployment_error(log)
+                break
+            elif "Deployment complete" in log["content"]:
+                # Success! Start monitoring
+                await start_monitoring(client)
+                break
+                
+        await asyncio.sleep(5)
 ```
+
+**Why it's perfect for AI:**
+- 📋 Structured JSON responses (not raw terminal chaos)
+- 🎯 Precise process control (start, stop, restart, send input)
+- 📊 Reliable log parsing with timestamps and sources
+- 🔄 Stateless operations (no terminal state to manage)
+- 🛡️ Safe interaction (can't accidentally break the terminal)
 
 ## Core Features
 
@@ -50,6 +109,22 @@ await client.request("send", {"id": result["id"], "data": "stop\n"})
 - **Guaranteed Cleanup**: PID journaling ensures no orphaned processes
 - **Asyncio-based**: Efficient concurrent process management
 - **Type-Safe**: Fully typed for better IDE support and fewer bugs
+
+## 10-Second Pitch
+
+**Without Climux:**
+- 🪟 Alt-tab between 10 terminal windows
+- 😵 Lose track of which process is which
+- 🔍 Scroll through walls of logs to find that one error
+- 🔄 Kill and restart processes manually
+- 🤖 AI agents can't help - they can't control terminals
+
+**With Climux:**
+- 📋 `climux list` - See everything at a glance
+- 🎯 `climux tail backend` - Jump to any process instantly  
+- 📊 `climux logs api --lines 50` - Get exactly what you need
+- ⚡ `climux restart frontend` - One command, done
+- 🤝 AI agents can manage your dev environment for you
 
 ## Quick Start
 
@@ -66,104 +141,253 @@ climux list
 climux logs webserver
 ```
 
-## Real-World Examples
+## Real-World Use Cases
 
-### Web Development Setup
+### 💻 Local Development Workflows
+
+#### The "Full Stack Startup" Script
+Save this as `dev.sh` and never juggle terminals again:
 ```bash
-# Start your entire dev environment with one command
-climux start npm run dev --name frontend --cwd ./frontend
-climux start python manage.py runserver --name django --cwd ./backend
-climux start redis-server --name redis
-climux start celery worker -A myapp --name celery
-
-# Check what's running
-climux list
-# [1] frontend: running (PID: 12345)
-# [2] django: running (PID: 12346)
-# [3] redis: running (PID: 12347)
-# [4] celery: running (PID: 12348)
-
-# Debug issues
-climux logs django --lines 50
-climux tail frontend
-```
-
-### Data Science Workflow
-```bash
-# Start Jupyter and monitor resources
-climux start jupyter lab --name jupyter
-climux start nvidia-smi -l 1 --name gpu-monitor
-climux start htop --name system-monitor
-
-# Run long training jobs
-climux start python train.py --epochs 100 --name training
-climux tail training  # Watch progress
-
-# Send commands to interactive processes
-climux send training "pause\n"  # Pause training
-climux send training "resume\n" # Resume training
-```
-
-### CI/CD Testing
-```bash
-# Run multiple test suites in parallel
-climux start pytest tests/unit --name unit-tests
-climux start pytest tests/integration --name integration-tests  
-climux start npm test --name frontend-tests
-
-# Wait for all to complete
-while climux list | grep -q "running"; do
+#!/bin/bash
+# Start climux if not running
+if ! climux ping 2>/dev/null; then
+    climux server &
     sleep 1
-done
+fi
 
-# Check results
-for id in 1 2 3; do
-    echo "=== Process $id logs ==="
-    climux logs $id | tail -20
-done
+# Start your entire stack
+climux start npm run dev --name frontend --cwd ./frontend
+climux start python manage.py runserver --name api --cwd ./backend  
+climux start docker-compose up postgres redis --name services
+climux start npm run test:watch --name tests --cwd ./frontend
+climux start python manage.py celery worker --name worker --cwd ./backend
+
+echo "🚀 Dev environment ready!"
+echo "Commands:"
+echo "  climux list          - See all processes"
+echo "  climux tail <name>   - Follow logs"
+echo "  climux restart <name> - Restart a service"
+echo "  ./dev.sh stop        - Stop everything"
+
+if [ "$1" = "stop" ]; then
+    for id in $(climux list | grep -o '^[0-9]*'); do
+        climux stop $id
+    done
+fi
 ```
 
-### Agent Integration Example
-```python
-import asyncio
-from pathlib import Path
-from climux import ClimuxClient
+#### Debugging Production Issues Locally
+```bash
+# Reproduce production environment locally
+climux start python app.py --name api --env ENVIRONMENT=staging
+climux start node worker.js --name worker --env ENVIRONMENT=staging
+climux start redis-server --config redis.prod.conf --name redis
 
-async def train_model_with_monitoring():
-    """Example of agent-controlled model training."""
-    client = ClimuxClient(Path("/tmp/climux/default.sock"))
+# Reproduce the issue
+climux send api "trigger_bug_endpoint\n"
+
+# Capture everything
+climux logs api --lines 1000 > api_debug.log
+climux logs worker --lines 1000 > worker_debug.log
+
+# Interactive debugging
+climux send api "import pdb; pdb.set_trace()\n"
+climux tail api  # Now you can debug interactively!
+```
+
+#### Microservices Development
+```bash
+# Start 10 microservices without 10 terminals
+for service in auth user product cart payment shipping inventory search recommendation analytics; do
+    climux start npm run dev --name $service --cwd ./services/$service
+done
+
+# Health check all services
+for service in $(climux list | awk '{print $2}' | grep -v "name"); do
+    echo "Checking $service..."
+    climux logs $service --lines 5 | grep -q "Ready" && echo "✅ $service is ready"
+done
+
+# Restart a specific service after code changes
+climux restart cart
+
+# See which services are consuming most resources
+climux list  # Shows PIDs
+# Use htop/top to monitor those specific PIDs
+```
+
+### 🤖 AI Agent Workflows
+
+#### Autonomous Development Assistant
+```python
+class DevAssistant:
+    """AI assistant that manages your development environment."""
     
-    # Start training
-    proc = await client.request("start", {
-        "command": ["python", "train.py", "--model", "gpt"],
-        "name": "model-training",
-        "max_log_lines": 10000
-    })
+    def __init__(self, climux_client):
+        self.client = climux_client
+        self.processes = {}
     
-    # Monitor training progress
-    while True:
-        logs = await client.request("logs", {
-            "id": proc["id"], 
-            "lines": 5
-        })
-        
-        # Check for completion or errors
-        last_logs = "\n".join(log["content"] for log in logs)
-        if "Training complete" in last_logs:
-            break
-        elif "ERROR" in last_logs:
-            # Handle error
-            await client.request("stop", {"id": proc["id"]})
-            raise Exception("Training failed")
+    async def setup_project(self, project_type: str):
+        """Intelligently set up a development environment."""
+        if project_type == "django":
+            # Start database first
+            db = await self.client.request("start", {
+                "command": ["docker", "run", "-p", "5432:5432", "postgres"],
+                "name": "database"
+            })
             
-        await asyncio.sleep(10)
+            # Wait for database to be ready
+            await self.wait_for_log(db["id"], "database system is ready")
+            
+            # Run migrations
+            migrate = await self.client.request("start", {
+                "command": ["python", "manage.py", "migrate"],
+                "name": "migrations"
+            })
+            await self.wait_for_completion(migrate["id"])
+            
+            # Start the dev server
+            server = await self.client.request("start", {
+                "command": ["python", "manage.py", "runserver"],
+                "name": "django-server"
+            })
+            
+            return "✅ Django environment ready at http://localhost:8000"
     
-    # Get final metrics
-    final_logs = await client.request("snapshot", {
-        "id": proc["id"],
-        "lines": 100
-    })
-    return parse_metrics(final_logs)
+    async def diagnose_issue(self, error_description: str):
+        """Analyze logs across all processes to diagnose issues."""
+        all_processes = await self.client.request("list")
+        
+        for proc in all_processes:
+            if proc["status"] == "exited" and proc["exit_code"] != 0:
+                # Get error logs
+                logs = await self.client.request("logs", {
+                    "id": proc["id"],
+                    "lines": 50
+                })
+                
+                # AI analyzes the logs
+                error_analysis = self.analyze_error_logs(logs)
+                if error_analysis["confidence"] > 0.8:
+                    # Attempt automatic fix
+                    await self.apply_fix(proc, error_analysis["solution"])
+```
+
+#### Continuous Integration Bot
+```python
+async def ci_pipeline(client: ClimuxClient, pr_number: int):
+    """AI-driven CI pipeline that adapts to project needs."""
+    
+    # Detect project type and test requirements
+    project_files = os.listdir(".")
+    test_commands = detect_test_commands(project_files)
+    
+    # Run all tests in parallel
+    test_processes = []
+    for cmd in test_commands:
+        proc = await client.request("start", {
+            "command": cmd.split(),
+            "name": f"test-{cmd[0]}"
+        })
+        test_processes.append(proc)
+    
+    # Monitor and report results
+    results = {}
+    for proc in test_processes:
+        status = await wait_for_completion(client, proc["id"])
+        logs = await client.request("logs", {"id": proc["id"]})
+        
+        # Parse test results
+        results[proc["name"]] = parse_test_output(logs)
+    
+    # Generate intelligent summary
+    return generate_ci_report(results, pr_number)
+```
+
+#### Production Monitoring Agent
+```python
+async def production_monitor(client: ClimuxClient):
+    """AI agent that monitors production-like environments."""
+    
+    # Start monitoring dashboards
+    monitors = {
+        "logs": await client.request("start", {
+            "command": ["tail", "-f", "/var/log/app.log"],
+            "name": "log-monitor"
+        }),
+        "metrics": await client.request("start", {
+            "command": ["python", "collect_metrics.py"],
+            "name": "metrics-collector"
+        }),
+        "health": await client.request("start", {
+            "command": ["python", "health_check.py"],
+            "name": "health-checker"
+        })
+    }
+    
+    # Continuous monitoring loop
+    while True:
+        for name, proc in monitors.items():
+            logs = await client.request("logs", {
+                "id": proc["id"],
+                "lines": 100
+            })
+            
+            # AI analyzes patterns
+            anomalies = detect_anomalies(logs)
+            if anomalies:
+                await handle_production_issue(anomalies)
+        
+        await asyncio.sleep(30)
+```
+
+### 🚀 Quick Productivity Wins
+
+#### One-Liner Dev Environment
+```bash
+# Add to your .bashrc/.zshrc
+alias dev='climux server & sleep 1 && climux start npm run dev --name fe && climux start python api.py --name be && climux list'
+alias dev-stop='pkill -f "climux server" && echo "Dev environment stopped"'
+alias dev-logs='climux logs $(climux list | fzf | cut -d" " -f1)'
+```
+
+#### Git Hook for Automatic Testing
+```bash
+# .git/hooks/pre-push
+#!/bin/bash
+climux start pytest --name tests
+climux start npm test --name js-tests
+
+# Wait for tests to complete
+while climux list | grep -E "tests.*running"; do sleep 1; done
+
+# Check if tests passed
+if climux logs tests | grep -q "FAILED"; then
+    echo "❌ Tests failed! Push aborted."
+    exit 1
+fi
+```
+
+#### VSCode Task Integration
+```json
+// .vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Dev Environment",
+      "type": "shell",
+      "command": "climux server || true && climux start npm run dev --name frontend",
+      "problemMatcher": []
+    },
+    {
+      "label": "View Backend Logs",
+      "type": "shell",
+      "command": "climux tail backend",
+      "problemMatcher": []
+    }
+  ]
+}
 ```
 
 ## Advanced Usage
