@@ -16,6 +16,7 @@ CLIMUX_PATH = Path(__file__).parent.parent / "climux.py"
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)  # This test should timeout
+@pytest.mark.xfail(reason="Demonstrates pipe buffering issue - expected to timeout")
 async def test_cli_tail_hangs_with_subprocess(climux_server, climux_client):
     """
     This test demonstrates the hanging issue when using subprocess.PIPE
@@ -116,6 +117,7 @@ async def test_cli_tail_fixed_with_pexpect(climux_server, climux_client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Moved to test_cli_signal_sync.py with working implementation")
 async def test_cli_tail_with_signal_synchronization(climux_server, climux_client):
     """
     This test uses signal-based synchronization instead of time.sleep()
