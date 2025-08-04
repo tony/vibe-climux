@@ -25,9 +25,32 @@ Climux is a headless CLI process manager written in Python 3.13+ using only the 
 - **Add a dev dependency**: `uv add --dev <package>`
 
 ### Testing
+
+Tests are fully contained within pytest and utilize its lifecycle hooks and fixtures. All test functionality should be implemented using pytest's internal APIs and fixtures rather than external scripts.
+
+#### Running Tests
 - **Run all tests**: `uv run pytest` or `uv run py.test`
 - **Run a specific test**: `uv run pytest tests/test_climux.py::TestBasicOperations::test_server_ping`
 - **Watch mode (auto-test)**: `uv run pytest-watcher`
+- **Parallel execution**: `uv run pytest -n auto` (pytest-xdist)
+- **Verbose with timing**: `uv run pytest -vv --durations=10`
+- **Debug mode**: `uv run pytest -xvs --tb=short`
+
+#### Test Architecture Principles
+- **Fully pytest-contained**: All test functionality uses pytest fixtures, hooks, and plugins
+- **Functional-based tests**: Tests replicate real-world usage scenarios
+- **Perfect test fixtures**: Fixtures spawn sandboxed testbeds with full isolation
+- **Dependency injection**: Use pytest fixtures for dependency injection and factories
+- **Complete cleanup**: Every fixture guarantees cleanup via pytest's teardown mechanisms
+- **pytest-xdist compatible**: All tests support parallel execution with proper isolation
+- **No external test runners**: Test orchestration happens entirely within pytest
+
+#### Key Testing Patterns
+1. **Fixture-based isolation**: Each test gets its own server instance via fixtures
+2. **Async support**: Uses pytest-asyncio for async test support
+3. **Process monitoring**: Uses psutil within fixtures for process leak detection
+4. **Debug helpers**: Test helpers are pytest fixtures, not standalone utilities
+5. **Parameterized testing**: Use `@pytest.mark.parametrize` for test variations
 
 ### Code Quality
 - **Run all checks**: `uv run ruff check . && uv run ruff format . --check && uv run mypy .`

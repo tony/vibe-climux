@@ -19,6 +19,8 @@ dev-dependencies = [
   "pytest-timeout",
   "pytest-watcher",
   "pytest-xdist",
+  "psutil",  # For process monitoring in tests
+  "types-psutil",  # Type stubs for psutil
     # Lint
   "ruff",
   "mypy",
@@ -77,11 +79,19 @@ convention = "numpy"
 "*/__init__.py" = ["F401"]
 
 [tool.pytest.ini_options]
-addopts = "--tb=short --no-header --showlocals --doctest-modules"
+addopts = "--tb=short --no-header --showlocals --doctest-modules --strict-markers"
 doctest_optionflags = "ELLIPSIS NORMALIZE_WHITESPACE"
 testpaths = [
   "tests",
 ]
+asyncio_mode = "auto"  # Auto-detect async tests
+markers = [
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "integration: marks tests as integration tests",
+  "stress: marks tests as stress tests",
+]
+# Ensure test isolation
+tmp_path_retention_policy = "failed"  # Keep tmp dirs only for failed tests
 
 [tool.pytest-watcher]
 now = true
