@@ -10,8 +10,8 @@ authors = [
 ]
 dependencies = []
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
   ### Testing ###
   "pytest",
   "pytest-asyncio",
