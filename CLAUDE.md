@@ -129,6 +129,102 @@ This is an indication to investigate deeper rather than just apply fixes:
 - **Strict Type Checking**: mypy configured with strict mode enforcing type safety
 - **Comprehensive Linting**: ruff configured with extensive rule sets for code quality
 
+## Logging Standards
+
+These rules guide future logging changes; existing code may not yet conform.
+
+### Logger setup
+
+- Use `logging.getLogger(__name__)` in every module
+- Add `NullHandler` in library `__init__.py` files
+- Never configure handlers, levels, or formatters in library code — that's the application's job
+
+### Structured context via `extra`
+
+Pass structured data on every log call where useful for filtering, searching, or test assertions.
+
+**Core keys** (stable, scalar, safe at any log level):
+
+| Key | Type | Context |
+|-----|------|---------|
+| `climux_process_id` | `str` | managed process ID |
+| `climux_command` | `str` | command executed |
+| `climux_socket_path` | `str` | Unix socket path |
+| `climux_exit_code` | `int` | process exit code |
+| `climux_session_id` | `str` | JSON-RPC session ID |
+
+**Heavy/optional keys** (DEBUG only, potentially large):
+
+| Key | Type | Context |
+|-----|------|---------|
+| `climux_stdout` | `list[str]` | process stdout lines (truncate or cap; `%(climux_stdout)s` produces repr) |
+| `climux_stderr` | `list[str]` | process stderr lines (same caveats) |
+
+Treat established keys as compatibility-sensitive — downstream users may build dashboards and alerts on them. Change deliberately.
+
+### Key naming rules
+
+- `snake_case`, not dotted; `climux_` prefix
+- Prefer stable scalars; avoid ad-hoc objects
+- Heavy keys (`climux_stdout`, `climux_stderr`) are DEBUG-only; consider companion `climux_stdout_len` fields or hard truncation (e.g. `stdout[:100]`)
+
+### Lazy formatting
+
+`logger.debug("msg %s", val)` not f-strings. Two rationales:
+- Deferred string interpolation: skipped entirely when level is filtered
+- Aggregator message template grouping: `"Running %s"` is one signature grouped ×10,000; f-strings make each line unique
+
+When computing `val` itself is expensive, guard with `if logger.isEnabledFor(logging.DEBUG)`.
+
+### stacklevel for wrappers
+
+Increment for each wrapper layer so `%(filename)s:%(lineno)d` and OTel `code.filepath` point to the real caller. Verify whenever call depth changes.
+
+### LoggerAdapter for persistent context
+
+For objects with stable identity (Server, Session, Process), use `LoggerAdapter` to avoid repeating the same `extra` on every call. Lead with the portable pattern (override `process()` to merge); `merge_extra=True` simplifies this on Python 3.13+.
+
+### Log levels
+
+| Level | Use for | Examples |
+|-------|---------|----------|
+| `DEBUG` | Internal mechanics, process I/O | Command + stdout, socket negotiation |
+| `INFO` | Process lifecycle, user-visible operations | Process started, session created, server listening |
+| `WARNING` | Recoverable issues, deprecation, user-actionable config | Orphaned process, deprecated option |
+| `ERROR` | Failures that stop an operation | Socket bind failed, process crashed |
+
+Config discovery noise belongs in `DEBUG`; only surprising/user-actionable config issues → `WARNING`.
+
+### Message style
+
+- Lowercase, past tense for events: `"process started"`, `"socket bind failed"`
+- No trailing punctuation
+- Keep messages short; put details in `extra`, not the message string
+
+### Exception logging
+
+- Use `logger.exception()` only inside `except` blocks when you are **not** re-raising
+- Use `logger.error(..., exc_info=True)` when you need the traceback outside an `except` block
+- Avoid `logger.exception()` followed by `raise` — this duplicates the traceback. Either add context via `extra` that would otherwise be lost, or let the exception propagate
+
+### Testing logs
+
+Assert on `caplog.records` attributes, not string matching on `caplog.text`:
+- Scope capture: `caplog.at_level(logging.DEBUG, logger="climux.server")`
+- Filter records rather than index by position: `[r for r in caplog.records if hasattr(r, "climux_command")]`
+- Assert on schema: `record.climux_exit_code == 0` not `"exit code 0" in caplog.text`
+- `caplog.record_tuples` cannot access extra fields — always use `caplog.records`
+
+### Avoid
+
+- f-strings/`.format()` in log calls
+- Unguarded logging in hot loops (guard with `isEnabledFor()`)
+- Catch-log-reraise without adding new context
+- `print()` for diagnostics
+- Logging secret env var values (log key names only)
+- Non-scalar ad-hoc objects in `extra`
+- Requiring custom `extra` fields in format strings without safe defaults (missing keys raise `KeyError`)
+
 ## Parallel Execution Pattern for AI Agents
 
 Climux enables a powerful pattern for AI agents: **parallel task execution with deferred result collection**. This allows agents to:
