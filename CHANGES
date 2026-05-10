@@ -1,0 +1,25 @@
+# Changelog
+
+To install the unreleased climux version, see [developmental releases](https://climux.git-pull.com/quickstart.html#developmental-releases).
+
+[pip](https://pip.pypa.io/en/stable/):
+
+```console
+$ pip install --user --upgrade --pre climux
+```
+
+[uv](https://docs.astral.sh/uv/):
+
+```console
+$ uv add climux --prerelease allow
+```
+
+## climux 0.0.0 (unreleased)
+
+<!-- KEEP THIS PLACEHOLDER - DO NOT REMOVE OR MODIFY THIS LINE -->
+_Notes on the upcoming release will go here._
+<!-- END PLACEHOLDER - ADD NEW CHANGELOG ENTRIES BELOW THIS LINE -->
+
+<!---
+.. vim: set filetype=markdown:
+-->
