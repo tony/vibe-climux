@@ -129,6 +129,32 @@ This is an indication to investigate deeper rather than just apply fixes:
 - **Strict Type Checking**: mypy configured with strict mode enforcing type safety
 - **Comprehensive Linting**: ruff configured with extensive rule sets for code quality
 
+## Docstring Standards
+
+**Classes with fields** — `NamedTuple`, dataclasses — document every field in
+an `Attributes` section:
+
+```python
+@dataclass
+class LogEntry:
+    """A single log entry with timestamp and content.
+
+    Attributes
+    ----------
+    timestamp : datetime.datetime
+        When the line was captured, in UTC.
+    source : str
+        Stream it came from: ``stdout``, ``stderr``, or ``system``.
+    content : str
+        Line text, without the trailing newline.
+    """
+```
+
+Autodoc renders every field whether or not you describe it, so an
+undocumented `NamedTuple` field ships to the API docs as "Alias for field
+number 0" and a dataclass field ships bare. Document all of them — a class
+with three fields and two documented still ships a stub for the third.
+
 ## Logging Standards
 
 These rules guide future logging changes; existing code may not yet conform.
