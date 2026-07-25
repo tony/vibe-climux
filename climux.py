@@ -35,7 +35,28 @@ SNAPSHOT_DEFAULT_LINES = 25
 # --- Data Structures ---
 @dataclass
 class ProcessConfig:
-    """Configuration for a managed process."""
+    """Configuration for a managed process.
+
+    Attributes
+    ----------
+    command : list[str]
+        Argv of the child process; the first element is the executable, which
+        is resolved without a shell.
+    name : str | None
+        Label used to identify the process in listings. ``None`` falls back to
+        ``process-<id>``.
+    cwd : Path | None
+        Working directory for the child. ``None`` inherits the server's.
+    env : dict[str, str] | None
+        Variables layered on top of the server's environment. ``None`` passes
+        that environment through unchanged.
+    max_log_lines : int
+        Cap on buffered log entries; the oldest are dropped once the buffer
+        grows past it. Zero or negative keeps every entry.
+    max_log_hours : float
+        Age cutoff, in hours, applied when logs are read back; older entries
+        are filtered out. Zero or negative disables the cutoff.
+    """
 
     command: list[str]
     name: str | None = None
@@ -47,7 +68,18 @@ class ProcessConfig:
 
 @dataclass
 class LogEntry:
-    """A single log entry with timestamp and content."""
+    """A single log entry with timestamp and content.
+
+    Attributes
+    ----------
+    timestamp : datetime
+        When the entry was recorded, in UTC.
+    source : str
+        Where the text came from: ``stdout``, ``stderr``, ``stdin`` for input
+        echoed back on send, or ``system`` for climux's own lifecycle notes.
+    content : str
+        Line text, without the trailing newline.
+    """
 
     timestamp: datetime
     source: str  # stdout, stderr, or system
@@ -64,7 +96,34 @@ class LogEntry:
 
 @dataclass
 class ManagedProcess:
-    """A process managed by climux."""
+    """A process managed by climux.
+
+    Attributes
+    ----------
+    id : int
+        Server-assigned handle, unique within a server, that CLI commands and
+        JSON-RPC calls use to address the process.
+    config : ProcessConfig
+        Command, working directory, environment and log limits the process
+        runs under.
+    process : asyncio.subprocess.Process | None
+        Handle on the spawned child. ``None`` before the first start and after
+        a start that failed.
+    status : str
+        Lifecycle state: ``stopped`` before the first start, ``running`` while
+        the child is alive, ``failed`` if the spawn raised, ``exited`` once the
+        child has been reaped.
+    pid : int | None
+        OS process id of the running child, cleared to ``None`` on exit.
+    exit_code : int | None
+        Wait status of the most recent run. ``None`` until the child exits.
+    start_time : datetime | None
+        UTC timestamp of the last successful start, used to derive uptime.
+        ``None`` before the first start.
+    logs : deque[LogEntry]
+        Captured output in arrival order, trimmed from the left once it
+        exceeds ``config.max_log_lines``.
+    """
 
     id: int
     config: ProcessConfig
