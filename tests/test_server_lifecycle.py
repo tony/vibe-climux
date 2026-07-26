@@ -286,7 +286,7 @@ class TestServerRobustness:
             results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
         # All should succeed
-        for returncode, stdout, stderr in results:
+        for returncode, _stdout, stderr in results:
             assert returncode == 0, f"Failed: {stderr}"
 
         # All processes should be listed
