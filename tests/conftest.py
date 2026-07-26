@@ -215,10 +215,9 @@ class ProcessFactory:
     async def cleanup(self) -> None:
         """Stop all created processes."""
         for process_id in self.created_processes:
-            try:
+            # The process may have exited on its own already
+            with contextlib.suppress(Exception):
                 await self.client.request("stop", {"id": process_id})
-            except Exception:
-                pass  # Process might already be stopped
 
 
 @pytest_asyncio.fixture
@@ -270,10 +269,8 @@ def assert_process_cleanup():
     if leaked_pids:
         # Try to clean up leaked processes
         for pid in leaked_pids:
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
 
         pytest.fail(f"Test leaked processes with PIDs: {leaked_pids}")
 

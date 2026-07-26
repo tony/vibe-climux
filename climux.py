@@ -575,10 +575,9 @@ class ClimuxServer:
             if process.pid:
                 pids[str(process.id)] = process.pid
 
-        try:
+        # Best effort: the journal is a cleanup aid, not a source of truth
+        with contextlib.suppress(Exception):
             self.pid_journal_path.write_text(json.dumps(pids))
-        except Exception:
-            pass  # Best effort
 
     async def _cleanup_stale_pids(self) -> None:
         """Clean up PIDs from a previous run."""
