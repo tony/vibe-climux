@@ -99,8 +99,7 @@ class TestServerCrashRecovery:
 class TestSocketOptions:
     """Test -L and -S socket options with implicit start."""
 
-    @pytest.mark.asyncio
-    async def test_socket_name_option(self, temp_socket_dir: Path):
+    def test_socket_name_option(self, temp_socket_dir: Path):
         """Test -L option for named sockets."""
         import subprocess
         import sys
@@ -158,8 +157,7 @@ class TestSocketOptions:
             )
             expected_socket.unlink(missing_ok=True)
 
-    @pytest.mark.asyncio
-    async def test_socket_path_option(self, temp_socket_dir: Path):
+    def test_socket_path_option(self, temp_socket_dir: Path):
         """Test -S option for full socket paths."""
         import subprocess
         import sys
@@ -206,9 +204,8 @@ class TestSocketOptions:
 class TestPermissionErrors:
     """Test handling of permission errors."""
 
-    @pytest.mark.asyncio
     @pytest.mark.skipif(os.getuid() == 0, reason="Cannot test permissions as root")
-    async def test_socket_permission_denied(self, temp_socket_dir: Path):
+    def test_socket_permission_denied(self, temp_socket_dir: Path):
         """Test graceful handling when socket directory has no write permission."""
         import subprocess
         import sys
