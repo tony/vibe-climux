@@ -429,6 +429,7 @@ class ServerController:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
         return result.returncode, result.stdout, result.stderr
 
@@ -477,6 +478,7 @@ def cli_runner(unique_socket_path: Path) -> Generator[Any, None, None]:
                 capture_output=True,
                 text=True,
                 cwd=Path(__file__).parent.parent,
+                check=False,
             )
 
             # Track any server that might have been started
@@ -505,6 +507,7 @@ def cli_runner(unique_socket_path: Path) -> Generator[Any, None, None]:
                     capture_output=True,
                     text=True,
                     cwd=Path(__file__).parent.parent,
+                    check=False,
                 )
 
         return result.returncode, result.stdout, result.stderr

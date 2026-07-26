@@ -124,6 +124,7 @@ class TestSocketOptions:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
 
         assert result.returncode == 0, f"Failed: {result.stderr}"
@@ -139,6 +140,7 @@ class TestSocketOptions:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
 
         assert result.returncode == 0
@@ -148,7 +150,12 @@ class TestSocketOptions:
         if expected_socket.exists():
             # Kill the server
             cmd = [sys.executable, "climux.py", "-L", socket_name, "ping"]
-            subprocess.run(cmd, capture_output=True, cwd=Path(__file__).parent.parent)
+            subprocess.run(
+                cmd,
+                capture_output=True,
+                cwd=Path(__file__).parent.parent,
+                check=False,
+            )
             expected_socket.unlink(missing_ok=True)
 
     @pytest.mark.asyncio
@@ -176,6 +183,7 @@ class TestSocketOptions:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
 
         assert result.returncode == 0, f"Failed: {result.stderr}"
@@ -188,6 +196,7 @@ class TestSocketOptions:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
 
         assert result.returncode == 0
@@ -226,6 +235,7 @@ class TestPermissionErrors:
                 capture_output=True,
                 text=True,
                 cwd=Path(__file__).parent.parent,
+                check=False,
             )
 
             # Should fail gracefully
