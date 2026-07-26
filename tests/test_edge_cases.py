@@ -244,7 +244,7 @@ class TestPermissionErrors:
         server_controller.run_client_command(["start", "sleep", "30", "--name", "test"])
 
         # Try to start server explicitly
-        returncode, stdout, stderr = server_controller.run_client_command(["server"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["server"])
 
         # Should detect existing server
         assert "already running" in stdout.lower() or returncode == 0
@@ -260,13 +260,13 @@ class TestProcessCleanup:
     ):
         """Test that orphaned processes are cleaned up on server restart."""
         # Start a long-running process
-        returncode, stdout, stderr = server_controller.run_client_command(
+        returncode, stdout, _stderr = server_controller.run_client_command(
             ["start", "sleep", "300", "--name", "orphan-test"]
         )
         assert returncode == 0
 
         # Get the process list to find PID
-        returncode, stdout, stderr = server_controller.run_client_command(["list"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["list"])
         assert returncode == 0
 
         # Extract PID from output (format: [1] orphan-test: running (PID: 12345))
@@ -302,7 +302,7 @@ class TestProcessCleanup:
             process_still_alive = False
 
         # Start new server - should clean up orphaned process via PID journal
-        returncode, stdout, stderr = server_controller.run_client_command(["ping"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["ping"])
 
         # Give cleanup time to work
         if process_still_alive:
