@@ -42,8 +42,7 @@ class TestImplicitServerStart:
         assert returncode == 0
         assert "test" in stdout
 
-    @pytest.mark.asyncio
-    async def test_second_command_uses_existing_server(
+    def test_second_command_uses_existing_server(
         self, server_controller, unique_socket_path: Path
     ):
         """Test that subsequent commands use the already-running server."""

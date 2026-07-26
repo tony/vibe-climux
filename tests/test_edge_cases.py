@@ -17,8 +17,7 @@ import pytest
 class TestServerCrashRecovery:
     """Test recovery from server crashes."""
 
-    @pytest.mark.asyncio
-    async def test_server_restart_after_crash(
+    def test_server_restart_after_crash(
         self, server_controller, unique_socket_path: Path
     ):
         """Test that client commands work after server crashes."""
@@ -264,9 +263,8 @@ class TestPermissionErrors:
 class TestProcessCleanup:
     """Test process cleanup in edge cases."""
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason="PID journal cleanup happens on graceful shutdown")
-    async def test_orphaned_process_cleanup(
+    def test_orphaned_process_cleanup(
         self, server_controller, unique_socket_path: Path
     ):
         """Test that orphaned processes are cleaned up on server restart."""
