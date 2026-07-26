@@ -22,7 +22,7 @@ dev-dependencies = [
   "psutil",  # For process monitoring in tests
   "types-psutil",  # Type stubs for psutil
     # Lint
-  "ruff",
+  "ruff>=0.16.0",
   "mypy",
   "typing-extensions",
 ]
