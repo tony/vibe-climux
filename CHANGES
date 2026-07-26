@@ -27,6 +27,17 @@ _Notes on the upcoming release will go here._
 The dataclasses describing managed processes, their configuration, and
 captured log entries now say what each field holds.
 
+### Development
+
+#### Lint floor moved to ruff 0.16 (#5)
+
+Minimum `ruff>=0.16.0` (was unpinned). Contributors now get one shared set
+of diagnostics rather than whatever ruff their machine resolved.
+
+`ruff format` reaches the Python samples inside `README.md` and `AGENTS.md`
+in addition to the source tree, so documentation code blocks stay in step
+with the code they illustrate.
+
 <!---
 .. vim: set filetype=markdown:
 -->
