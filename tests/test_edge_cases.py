@@ -41,10 +41,14 @@ class TestServerCrashRecovery:
 
                 for proc in psutil.process_iter(["pid", "cmdline"]):
                     cmdline = proc.info.get("cmdline", [])
-                    if cmdline and "climux.py" in str(cmdline) and "server" in cmdline:
-                        if str(unique_socket_path) in str(cmdline):
-                            server_pid = proc.info["pid"]
-                            break
+                    if (
+                        cmdline
+                        and "climux.py" in str(cmdline)
+                        and "server" in cmdline
+                        and str(unique_socket_path) in str(cmdline)
+                    ):
+                        server_pid = proc.info["pid"]
+                        break
                 if server_pid:
                     break
             except Exception:
@@ -283,10 +287,14 @@ class TestProcessCleanup:
 
             for proc in psutil.process_iter(["pid", "cmdline"]):
                 cmdline = proc.info.get("cmdline", [])
-                if cmdline and "climux.py" in str(cmdline) and "server" in cmdline:
-                    if str(unique_socket_path) in str(cmdline):
-                        server_pid = proc.info["pid"]
-                        break
+                if (
+                    cmdline
+                    and "climux.py" in str(cmdline)
+                    and "server" in cmdline
+                    and str(unique_socket_path) in str(cmdline)
+                ):
+                    server_pid = proc.info["pid"]
+                    break
         except Exception:
             pass
 
