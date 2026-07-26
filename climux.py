@@ -610,8 +610,8 @@ class ClimuxClient:
         """Send a request to the server."""
         try:
             reader, writer = await asyncio.open_unix_connection(str(self.socket_path))
-        except (FileNotFoundError, ConnectionRefusedError):
-            raise RuntimeError(f"Cannot connect to server at {self.socket_path}")
+        except (FileNotFoundError, ConnectionRefusedError) as e:
+            raise RuntimeError(f"Cannot connect to server at {self.socket_path}") from e
 
         request = {
             "jsonrpc": "2.0",
