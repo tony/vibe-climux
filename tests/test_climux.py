@@ -523,14 +523,13 @@ class TestErrorHandling:
     ):
         """Test that exit codes are properly captured."""
         # Start process that exits with error
-        start_result = await climux_client.request(
+        await climux_client.request(
             "start",
             {
                 "command": [sys.executable, str(error_script)],
                 "name": "exit-code-test",
             },
         )
-        process_id = start_result["id"]
 
         await asyncio.sleep(0.2)  # Let process complete
 
@@ -719,16 +718,15 @@ class TestStress:
         num_processes = 50
 
         # Start many processes
-        tasks = []
-        for i in range(num_processes):
-            tasks.append(
-                process_factory.create(
-                    [sys.executable, str(counter_script), "2", "0.01"],
-                    name=f"stress-{i}",
-                )
+        tasks = [
+            process_factory.create(
+                [sys.executable, str(counter_script), "2", "0.01"],
+                name=f"stress-{i}",
             )
+            for i in range(num_processes)
+        ]
 
-        procs = await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks)
 
         # Verify all started
         processes = await climux_client.request("list")

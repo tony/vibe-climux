@@ -172,12 +172,14 @@ class ManagedProcess:
             self._monitor_task = asyncio.create_task(self._monitor_exit())
 
             self._add_log("system", f"Process started with PID {self.pid}")
-            return True
 
         except Exception as e:
             self.status = "failed"
             self._add_log("system", f"Failed to start: {e}")
             return False
+
+        else:
+            return True
 
     async def stop(self) -> bool:
         """Stop the process gracefully."""
@@ -212,10 +214,11 @@ class ManagedProcess:
             self.process.stdin.write(data.encode())
             await self.process.stdin.drain()
             self._add_log("stdin", data.rstrip())
-            return True
         except (BrokenPipeError, ConnectionResetError) as e:
             self._add_log("system", f"Failed to write to stdin: {e}")
             return False
+        else:
+            return True
 
     def get_status(self) -> dict[str, Any]:
         """Get current status as a dictionary."""
@@ -373,10 +376,11 @@ class ClimuxServer:
         self._running = False
 
         # Stop all processes
-        tasks = []
-        for process in self.processes.values():
-            if process.status == "running":
-                tasks.append(process.stop())
+        tasks = [
+            process.stop()
+            for process in self.processes.values()
+            if process.status == "running"
+        ]
 
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
@@ -449,9 +453,10 @@ class ClimuxServer:
 
         try:
             result = await handler(params)
-            return {"jsonrpc": "2.0", "result": result, "id": req_id}
         except Exception as e:
             return self._error_response(-32000, str(e), req_id)
+        else:
+            return {"jsonrpc": "2.0", "result": result, "id": req_id}
 
     # --- Request handlers ---
 
@@ -459,7 +464,8 @@ class ClimuxServer:
         """Start a new process."""
         command = params.get("command", [])
         if not command:
-            raise ValueError("Command is required")
+            msg = "Command is required"
+            raise ValueError(msg)
 
         config = ProcessConfig(
             command=command,
@@ -482,7 +488,8 @@ class ClimuxServer:
             return process.get_status()
         else:
             del self.processes[process_id]
-            raise RuntimeError("Failed to start process")
+            msg = "Failed to start process"
+            raise RuntimeError(msg)
 
     async def _handle_list(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """List all processes."""
@@ -493,7 +500,8 @@ class ClimuxServer:
         process_id = params.get("id")
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         await process.stop()
         self._update_pid_journal()
@@ -504,7 +512,8 @@ class ClimuxServer:
         process_id = params.get("id")
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         await process.restart()
         self._update_pid_journal()
@@ -517,11 +526,13 @@ class ClimuxServer:
 
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         success = await process.send_input(data)
         if not success:
-            raise RuntimeError("Failed to send input")
+            msg = "Failed to send input"
+            raise RuntimeError(msg)
 
         return {"status": "sent", "id": process_id}
 
@@ -532,7 +543,8 @@ class ClimuxServer:
 
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         return process.get_logs(lines=lines)
 
@@ -548,7 +560,8 @@ class ClimuxServer:
 
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         return process.get_logs(lines=lines)
 
@@ -575,10 +588,9 @@ class ClimuxServer:
             if process.pid:
                 pids[str(process.id)] = process.pid
 
-        try:
+        # Best effort: the journal is a cleanup aid, not a source of truth
+        with contextlib.suppress(Exception):
             self.pid_journal_path.write_text(json.dumps(pids))
-        except Exception:
-            pass  # Best effort
 
     async def _cleanup_stale_pids(self) -> None:
         """Clean up PIDs from a previous run."""
@@ -610,8 +622,9 @@ class ClimuxClient:
         """Send a request to the server."""
         try:
             reader, writer = await asyncio.open_unix_connection(str(self.socket_path))
-        except (FileNotFoundError, ConnectionRefusedError):
-            raise RuntimeError(f"Cannot connect to server at {self.socket_path}")
+        except (FileNotFoundError, ConnectionRefusedError) as e:
+            msg = f"Cannot connect to server at {self.socket_path}"
+            raise RuntimeError(msg) from e
 
         request = {
             "jsonrpc": "2.0",
@@ -628,11 +641,13 @@ class ClimuxClient:
         await writer.wait_closed()
 
         if not response_data:
-            raise RuntimeError("Empty response from server")
+            msg = "Empty response from server"
+            raise RuntimeError(msg)
 
         response = json.loads(response_data.decode())
         if "error" in response:
-            raise RuntimeError(f"Server error: {response['error']['message']}")
+            msg = f"Server error: {response['error']['message']}"
+            raise RuntimeError(msg)
 
         return response.get("result")
 
@@ -647,10 +662,11 @@ def is_server_running(socket_path: Path) -> bool:
     try:
         client = ClimuxClient(socket_path)
         result = asyncio.run(client.request("ping"))
-        return result == "pong"
     except (RuntimeError, ConnectionRefusedError, FileNotFoundError):
         # Socket exists but server not responding - stale socket
         return False
+    else:
+        return result == "pong"
 
 
 def start_server_daemon(socket_path: Path) -> None:
@@ -690,7 +706,7 @@ def start_server_daemon(socket_path: Path) -> None:
 
 
 def main() -> None:
-    """Main entry point."""
+    """Parse the command line and run the requested climux subcommand."""
     parser = argparse.ArgumentParser(
         description="Climux: A headless CLI process manager"
     )

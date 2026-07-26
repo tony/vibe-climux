@@ -66,18 +66,14 @@ Climux speaks JSON-RPC, making it the perfect bridge between AI and system proce
 # AI agents can now control processes like a senior developer
 async def deploy_and_monitor(client: ClimuxClient):
     # Start the deployment
-    deploy = await client.request("start", {
-        "command": ["./deploy.sh", "production"],
-        "name": "deployment"
-    })
-    
+    deploy = await client.request(
+        "start", {"command": ["./deploy.sh", "production"], "name": "deployment"}
+    )
+
     # Watch for completion or errors
     while True:
-        logs = await client.request("logs", {
-            "id": deploy["id"], 
-            "lines": 10
-        })
-        
+        logs = await client.request("logs", {"id": deploy["id"], "lines": 10})
+
         # AI can understand structured output
         for log in logs:
             if "ERROR" in log["content"]:
@@ -88,7 +84,7 @@ async def deploy_and_monitor(client: ClimuxClient):
                 # Success! Start monitoring
                 await start_monitoring(client)
                 break
-                
+
         await asyncio.sleep(5)
 ```
 
@@ -250,50 +246,55 @@ climux list  # Shows PIDs
 ```python
 class DevAssistant:
     """AI assistant that manages your development environment."""
-    
+
     def __init__(self, climux_client):
         self.client = climux_client
         self.processes = {}
-    
+
     async def setup_project(self, project_type: str):
         """Intelligently set up a development environment."""
         if project_type == "django":
             # Start database first
-            db = await self.client.request("start", {
-                "command": ["docker", "run", "-p", "5432:5432", "postgres"],
-                "name": "database"
-            })
-            
+            db = await self.client.request(
+                "start",
+                {
+                    "command": ["docker", "run", "-p", "5432:5432", "postgres"],
+                    "name": "database",
+                },
+            )
+
             # Wait for database to be ready
             await self.wait_for_log(db["id"], "database system is ready")
-            
+
             # Run migrations
-            migrate = await self.client.request("start", {
-                "command": ["python", "manage.py", "migrate"],
-                "name": "migrations"
-            })
+            migrate = await self.client.request(
+                "start",
+                {"command": ["python", "manage.py", "migrate"], "name": "migrations"},
+            )
             await self.wait_for_completion(migrate["id"])
-            
+
             # Start the dev server
-            server = await self.client.request("start", {
-                "command": ["python", "manage.py", "runserver"],
-                "name": "django-server"
-            })
-            
+            server = await self.client.request(
+                "start",
+                {
+                    "command": ["python", "manage.py", "runserver"],
+                    "name": "django-server",
+                },
+            )
+
             return "✅ Django environment ready at http://localhost:8000"
-    
+
     async def diagnose_issue(self, error_description: str):
         """Analyze logs across all processes to diagnose issues."""
         all_processes = await self.client.request("list")
-        
+
         for proc in all_processes:
             if proc["status"] == "exited" and proc["exit_code"] != 0:
                 # Get error logs
-                logs = await self.client.request("logs", {
-                    "id": proc["id"],
-                    "lines": 50
-                })
-                
+                logs = await self.client.request(
+                    "logs", {"id": proc["id"], "lines": 50}
+                )
+
                 # AI analyzes the logs
                 error_analysis = self.analyze_error_logs(logs)
                 if error_analysis["confidence"] > 0.8:
@@ -305,29 +306,28 @@ class DevAssistant:
 ```python
 async def ci_pipeline(client: ClimuxClient, pr_number: int):
     """AI-driven CI pipeline that adapts to project needs."""
-    
+
     # Detect project type and test requirements
     project_files = os.listdir(".")
     test_commands = detect_test_commands(project_files)
-    
+
     # Run all tests in parallel
     test_processes = []
     for cmd in test_commands:
-        proc = await client.request("start", {
-            "command": cmd.split(),
-            "name": f"test-{cmd[0]}"
-        })
+        proc = await client.request(
+            "start", {"command": cmd.split(), "name": f"test-{cmd[0]}"}
+        )
         test_processes.append(proc)
-    
+
     # Monitor and report results
     results = {}
     for proc in test_processes:
         status = await wait_for_completion(client, proc["id"])
         logs = await client.request("logs", {"id": proc["id"]})
-        
+
         # Parse test results
         results[proc["name"]] = parse_test_output(logs)
-    
+
     # Generate intelligent summary
     return generate_ci_report(results, pr_number)
 ```
@@ -336,36 +336,33 @@ async def ci_pipeline(client: ClimuxClient, pr_number: int):
 ```python
 async def production_monitor(client: ClimuxClient):
     """AI agent that monitors production-like environments."""
-    
+
     # Start monitoring dashboards
     monitors = {
-        "logs": await client.request("start", {
-            "command": ["tail", "-f", "/var/log/app.log"],
-            "name": "log-monitor"
-        }),
-        "metrics": await client.request("start", {
-            "command": ["python", "collect_metrics.py"],
-            "name": "metrics-collector"
-        }),
-        "health": await client.request("start", {
-            "command": ["python", "health_check.py"],
-            "name": "health-checker"
-        })
+        "logs": await client.request(
+            "start",
+            {"command": ["tail", "-f", "/var/log/app.log"], "name": "log-monitor"},
+        ),
+        "metrics": await client.request(
+            "start",
+            {"command": ["python", "collect_metrics.py"], "name": "metrics-collector"},
+        ),
+        "health": await client.request(
+            "start",
+            {"command": ["python", "health_check.py"], "name": "health-checker"},
+        ),
     }
-    
+
     # Continuous monitoring loop
     while True:
         for name, proc in monitors.items():
-            logs = await client.request("logs", {
-                "id": proc["id"],
-                "lines": 100
-            })
-            
+            logs = await client.request("logs", {"id": proc["id"], "lines": 100})
+
             # AI analyzes patterns
             anomalies = detect_anomalies(logs)
             if anomalies:
                 await handle_production_issue(anomalies)
-        
+
         await asyncio.sleep(30)
 ```
 

@@ -264,9 +264,15 @@ Climux enables a powerful pattern for AI agents: **parallel task execution with 
 ```python
 # Start multiple analysis tasks in parallel
 tasks = []
-tasks.append(await client.request("start", {"command": ["ruff", "check", "."], "name": "lint"}))
-tasks.append(await client.request("start", {"command": ["mypy", "."], "name": "typecheck"}))
-tasks.append(await client.request("start", {"command": ["pytest", "-x"], "name": "tests"}))
+tasks.append(
+    await client.request("start", {"command": ["ruff", "check", "."], "name": "lint"})
+)
+tasks.append(
+    await client.request("start", {"command": ["mypy", "."], "name": "typecheck"})
+)
+tasks.append(
+    await client.request("start", {"command": ["pytest", "-x"], "name": "tests"})
+)
 
 # Continue with other work while tasks run...
 # For example, analyze the codebase structure, read documentation, etc.

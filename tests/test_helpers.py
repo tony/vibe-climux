@@ -48,25 +48,30 @@ class DebugClient(ClimuxClient):
 
             if self.debug:
                 test_logger.debug(
-                    f"[Response #{self.request_count}] {method} completed in {elapsed:.3f}s: {result}"
+                    f"[Response #{self.request_count}] {method} "
+                    f"completed in {elapsed:.3f}s: {result}"
                 )
 
             self.request_history.append((method, params or {}, result))
-            return result
 
         except Exception as e:
             elapsed = time.monotonic() - start_time
             if self.debug:
-                test_logger.error(
-                    f"[Error #{self.request_count}] {method} failed after {elapsed:.3f}s: {e}"
+                test_logger.warning(
+                    f"[Error #{self.request_count}] {method} "
+                    f"failed after {elapsed:.3f}s: {e}"
                 )
             self.request_history.append((method, params or {}, e))
             raise
 
+        else:
+            return result
+
     def get_last_request(self) -> tuple[str, dict[str, Any], Any]:
         """Get the last request made."""
         if not self.request_history:
-            raise ValueError("No requests have been made")
+            msg = "No requests have been made"
+            raise ValueError(msg)
         return self.request_history[-1]
 
     def clear_history(self) -> None:
@@ -119,7 +124,8 @@ async def debug_server(
             server_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await server_task
-            raise TimeoutError(f"Server socket not created within {timeout}s")
+            msg = f"Server socket not created within {timeout}s"
+            raise TimeoutError(msg)
         await asyncio.sleep(0.05)
 
     try:
@@ -154,7 +160,8 @@ async def wait_for_process_status(
                     return proc
                 break
         else:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         await asyncio.sleep(poll_interval)
 
@@ -162,12 +169,14 @@ async def wait_for_process_status(
     processes = await client.request("list")
     for proc in processes:
         if proc["id"] == process_id:
-            raise TimeoutError(
+            msg = (
                 f"Process {process_id} did not reach status '{expected_status}' "
                 f"within {timeout}s. Current status: {proc['status']}"
             )
+            raise TimeoutError(msg)
 
-    raise ValueError(f"Process {process_id} disappeared while waiting")
+    msg = f"Process {process_id} disappeared while waiting"
+    raise ValueError(msg)
 
 
 async def get_process_logs_with_retry(
@@ -225,8 +234,8 @@ class ProcessMonitor:
             try:
                 processes = await self.client.request("list")
                 self.snapshots.append((time.monotonic(), processes))
-            except Exception as e:
-                test_logger.error(f"Monitor error: {e}")
+            except Exception:
+                test_logger.exception("Monitor error")
 
             await asyncio.sleep(interval)
 
@@ -260,10 +269,11 @@ def assert_log_contains(
     )
 
     source_msg = f" in source '{source}'" if source else ""
-    raise AssertionError(
+    msg = (
         f"Expected content '{expected_content}'{source_msg} not found in logs.\n"
         f"Last 10 log entries:\n{log_summary}"
     )
+    raise AssertionError(msg)
 
 
 def assert_process_in_list(
@@ -295,7 +305,8 @@ def assert_process_in_list(
         f"  [{p['id']}] {p['name']}: {p['status']}" for p in processes
     )
 
-    raise AssertionError(
+    msg = (
         f"No process found matching criteria: {', '.join(criteria)}\n"
         f"Available processes:\n{process_summary}"
     )
+    raise AssertionError(msg)

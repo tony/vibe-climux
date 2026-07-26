@@ -27,6 +27,31 @@ _Notes on the upcoming release will go here._
 The dataclasses describing managed processes, their configuration, and
 captured log entries now say what each field holds.
 
+### Development
+
+#### Lint floor moved to ruff 0.16 (#5)
+
+Minimum `ruff>=0.16.0` (was unpinned). Contributors now get one shared set
+of diagnostics rather than whatever ruff their machine resolved.
+
+`ruff format` reaches the Python samples inside `README.md` and `AGENTS.md`
+in addition to the source tree, so documentation code blocks stay in step
+with the code they illustrate.
+
+#### ruff's default rule set is now in force (#5)
+
+ruff 0.16 ships a curated default rule set, and naming rules under `select`
+opts a project out of it entirely. Lint configuration now layers this
+project's own linters on top of those defaults, so contributors see the
+diagnostics ruff treats as its baseline alongside the ones this project
+picked.
+
+Everything the wider set surfaced is fixed in the source rather than muted.
+The exceptions are the blind `except` handlers and the silent
+`try`/`except`/`pass` paths on the process-supervision and JSON-RPC
+boundaries, which carry per-file ignores in `pyproject.toml` next to the
+reason each one is deliberate.
+
 <!---
 .. vim: set filetype=markdown:
 -->

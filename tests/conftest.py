@@ -98,9 +98,7 @@ async def climux_client(
     climux_server: ClimuxServer,
     unique_socket_path: Path,
 ) -> ClimuxClient:
-    """
-    Create a ClimuxClient connected to the test server.
-    """
+    """Create a ClimuxClient connected to the test server."""
     return ClimuxClient(unique_socket_path)
 
 
@@ -217,19 +215,16 @@ class ProcessFactory:
     async def cleanup(self) -> None:
         """Stop all created processes."""
         for process_id in self.created_processes:
-            try:
+            # The process may have exited on its own already
+            with contextlib.suppress(Exception):
                 await self.client.request("stop", {"id": process_id})
-            except Exception:
-                pass  # Process might already be stopped
 
 
 @pytest_asyncio.fixture
 async def process_factory(
     climux_client: ClimuxClient,
 ) -> AsyncGenerator[ProcessFactory, None]:
-    """
-    Factory for creating test processes with automatic cleanup.
-    """
+    """Create test processes, stopping every one of them on teardown."""
     factory = ProcessFactory(climux_client)
     try:
         yield factory
@@ -274,10 +269,8 @@ def assert_process_cleanup():
     if leaked_pids:
         # Try to clean up leaked processes
         for pid in leaked_pids:
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
 
         pytest.fail(f"Test leaked processes with PIDs: {leaked_pids}")
 
@@ -328,7 +321,8 @@ async def managed_server(
     async def start_server() -> ClimuxServer:
         nonlocal server, server_task
         if server is not None:
-            raise RuntimeError("Server already running")
+            msg = "Server already running"
+            raise RuntimeError(msg)
 
         server = ClimuxServer(unique_socket_path)
         server_task = asyncio.create_task(server.start())
@@ -340,7 +334,8 @@ async def managed_server(
             await asyncio.sleep(0.05)
         else:
             server_task.cancel()
-            raise RuntimeError("Server failed to start")
+            msg = "Server failed to start"
+            raise RuntimeError(msg)
 
         return server
 
@@ -397,7 +392,8 @@ class ServerController:
             "-S",
             str(self.socket_path),
             "server",
-        ] + args
+            *args,
+        ]
         self.process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -412,7 +408,8 @@ class ServerController:
             time.sleep(0.1)
         else:
             self.stop_server_subprocess()
-            raise RuntimeError("Server subprocess failed to create socket")
+            msg = "Server subprocess failed to create socket"
+            raise RuntimeError(msg)
 
         return self.process
 
@@ -429,12 +426,13 @@ class ServerController:
 
     def run_client_command(self, args: list[str]) -> tuple[int, str, str]:
         """Run a client command against the server."""
-        cmd = [sys.executable, "climux.py", "-S", str(self.socket_path)] + args
+        cmd = [sys.executable, "climux.py", "-S", str(self.socket_path), *args]
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
         return result.returncode, result.stdout, result.stderr
 
@@ -473,7 +471,7 @@ def cli_runner(unique_socket_path: Path) -> Generator[Any, None, None]:
 
     def run(args: list[str], check_server: bool = True) -> tuple[int, str, str]:
         """Run a climux command."""
-        cmd = [sys.executable, "climux.py", "-S", str(unique_socket_path)] + args
+        cmd = [sys.executable, "climux.py", "-S", str(unique_socket_path), *args]
 
         # Check if this might start a server
         if check_server and args and args[0] != "server":
@@ -483,6 +481,7 @@ def cli_runner(unique_socket_path: Path) -> Generator[Any, None, None]:
                 capture_output=True,
                 text=True,
                 cwd=Path(__file__).parent.parent,
+                check=False,
             )
 
             # Track any server that might have been started
@@ -511,6 +510,7 @@ def cli_runner(unique_socket_path: Path) -> Generator[Any, None, None]:
                     capture_output=True,
                     text=True,
                     cwd=Path(__file__).parent.parent,
+                    check=False,
                 )
 
         return result.returncode, result.stdout, result.stderr

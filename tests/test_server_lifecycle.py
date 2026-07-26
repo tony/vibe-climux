@@ -42,8 +42,7 @@ class TestImplicitServerStart:
         assert returncode == 0
         assert "test" in stdout
 
-    @pytest.mark.asyncio
-    async def test_second_command_uses_existing_server(
+    def test_second_command_uses_existing_server(
         self, server_controller, unique_socket_path: Path
     ):
         """Test that subsequent commands use the already-running server."""
@@ -57,7 +56,7 @@ class TestImplicitServerStart:
         time.sleep(0.1)
 
         # Start second process
-        returncode, stdout, stderr = server_controller.run_client_command(
+        returncode, stdout, _stderr = server_controller.run_client_command(
             ["start", "sleep", "30", "--name", "proc2"]
         )
         assert returncode == 0
@@ -66,7 +65,7 @@ class TestImplicitServerStart:
         assert unique_socket_path.stat().st_mtime == socket_mtime
 
         # Both processes should be listed
-        returncode, stdout, stderr = server_controller.run_client_command(["list"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["list"])
         assert "proc1" in stdout
         assert "proc2" in stdout
 
@@ -74,13 +73,13 @@ class TestImplicitServerStart:
     async def test_server_command_behavior(self, cli_runner):
         """Test that 'climux server' behaves correctly."""
         # Start server explicitly
-        returncode, stdout, stderr = cli_runner(["server"])
+        returncode, stdout, _stderr = cli_runner(["server"])
 
         # Should return immediately (daemonized)
         assert returncode == 0
 
         # Server should be running
-        returncode, stdout, stderr = cli_runner(["ping"])
+        returncode, stdout, _stderr = cli_runner(["ping"])
         assert returncode == 0
         assert "pong" in stdout
 
@@ -98,7 +97,7 @@ class TestImplicitServerStart:
         assert unique_socket_path.exists()
 
         # Run another command and exit
-        returncode, stdout, stderr = server_controller.run_client_command(["list"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["list"])
         assert returncode == 0
 
         # Wait a bit
@@ -108,7 +107,7 @@ class TestImplicitServerStart:
         assert unique_socket_path.exists()
 
         # Process should still be listed
-        returncode, stdout, stderr = server_controller.run_client_command(["list"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["list"])
         assert "persistent" in stdout
 
 
@@ -121,11 +120,11 @@ class TestServerLifecycle:
     ):
         """Test that server can optionally clean up when last process exits."""
         # This tests the capability, even if not default behavior
-        server = await managed_server["start_server"]()
+        await managed_server["start_server"]()
         client = ClimuxClient(unique_socket_path)
 
         # Start a short-lived process
-        proc = await client.request(
+        await client.request(
             "start", {"command": ["echo", "test"], "name": "short-lived"}
         )
 
@@ -153,7 +152,7 @@ class TestServerLifecycle:
         # assert returncode == 0
 
         # For now, test that server can be queried
-        returncode, stdout, stderr = server_controller.run_client_command(["ping"])
+        returncode, _stdout, _stderr = server_controller.run_client_command(["ping"])
         assert returncode == 0
 
     @pytest.mark.asyncio
@@ -166,7 +165,7 @@ class TestServerLifecycle:
         unique_socket_path.touch()
 
         # Try to start server
-        returncode, stdout, stderr = server_controller.run_client_command(
+        returncode, _stdout, stderr = server_controller.run_client_command(
             ["start", "echo", "test", "--name", "test"]
         )
 
@@ -227,7 +226,7 @@ class TestServerAttachment:
 
         # Attach to server (would show dashboard)
         # This would be interactive in real implementation
-        returncode, stdout, stderr = server_controller.run_client_command(["attach"])
+        _returncode, stdout, _stderr = server_controller.run_client_command(["attach"])
 
         # Should show some status
         assert "test" in stdout or "running" in stdout
@@ -237,7 +236,6 @@ class TestServerAttachment:
     async def test_server_detach_leaves_running(self, server_controller):
         """Test that detaching leaves server running."""
         # This would test Ctrl+C or 'detach' command behavior
-        pass
 
 
 class TestServerRobustness:
@@ -256,7 +254,7 @@ class TestServerRobustness:
         pid_journal.write_text('{"1": 99999}')  # Non-existent PID
 
         # Start server - should clean up stale journal
-        returncode, stdout, stderr = server_controller.run_client_command(
+        returncode, _stdout, _stderr = server_controller.run_client_command(
             ["start", "echo", "test", "--name", "test"]
         )
 
@@ -287,7 +285,7 @@ class TestServerRobustness:
             results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
         # All should succeed
-        for returncode, stdout, stderr in results:
+        for returncode, _stdout, stderr in results:
             assert returncode == 0, f"Failed: {stderr}"
 
         # All processes should be listed

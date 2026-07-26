@@ -17,8 +17,7 @@ import pytest
 class TestServerCrashRecovery:
     """Test recovery from server crashes."""
 
-    @pytest.mark.asyncio
-    async def test_server_restart_after_crash(
+    def test_server_restart_after_crash(
         self, server_controller, unique_socket_path: Path
     ):
         """Test that client commands work after server crashes."""
@@ -41,10 +40,14 @@ class TestServerCrashRecovery:
 
                 for proc in psutil.process_iter(["pid", "cmdline"]):
                     cmdline = proc.info.get("cmdline", [])
-                    if cmdline and "climux.py" in str(cmdline) and "server" in cmdline:
-                        if str(unique_socket_path) in str(cmdline):
-                            server_pid = proc.info["pid"]
-                            break
+                    if (
+                        cmdline
+                        and "climux.py" in str(cmdline)
+                        and "server" in cmdline
+                        and str(unique_socket_path) in str(cmdline)
+                    ):
+                        server_pid = proc.info["pid"]
+                        break
                 if server_pid:
                     break
             except Exception:
@@ -95,8 +98,7 @@ class TestServerCrashRecovery:
 class TestSocketOptions:
     """Test -L and -S socket options with implicit start."""
 
-    @pytest.mark.asyncio
-    async def test_socket_name_option(self, temp_socket_dir: Path):
+    def test_socket_name_option(self, temp_socket_dir: Path):
         """Test -L option for named sockets."""
         import subprocess
         import sys
@@ -120,6 +122,7 @@ class TestSocketOptions:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
 
         assert result.returncode == 0, f"Failed: {result.stderr}"
@@ -135,6 +138,7 @@ class TestSocketOptions:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
 
         assert result.returncode == 0
@@ -144,11 +148,15 @@ class TestSocketOptions:
         if expected_socket.exists():
             # Kill the server
             cmd = [sys.executable, "climux.py", "-L", socket_name, "ping"]
-            subprocess.run(cmd, capture_output=True, cwd=Path(__file__).parent.parent)
+            subprocess.run(
+                cmd,
+                capture_output=True,
+                cwd=Path(__file__).parent.parent,
+                check=False,
+            )
             expected_socket.unlink(missing_ok=True)
 
-    @pytest.mark.asyncio
-    async def test_socket_path_option(self, temp_socket_dir: Path):
+    def test_socket_path_option(self, temp_socket_dir: Path):
         """Test -S option for full socket paths."""
         import subprocess
         import sys
@@ -172,6 +180,7 @@ class TestSocketOptions:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
 
         assert result.returncode == 0, f"Failed: {result.stderr}"
@@ -184,6 +193,7 @@ class TestSocketOptions:
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
+            check=False,
         )
 
         assert result.returncode == 0
@@ -193,9 +203,8 @@ class TestSocketOptions:
 class TestPermissionErrors:
     """Test handling of permission errors."""
 
-    @pytest.mark.asyncio
     @pytest.mark.skipif(os.getuid() == 0, reason="Cannot test permissions as root")
-    async def test_socket_permission_denied(self, temp_socket_dir: Path):
+    def test_socket_permission_denied(self, temp_socket_dir: Path):
         """Test graceful handling when socket directory has no write permission."""
         import subprocess
         import sys
@@ -222,6 +231,7 @@ class TestPermissionErrors:
                 capture_output=True,
                 text=True,
                 cwd=Path(__file__).parent.parent,
+                check=False,
             )
 
             # Should fail gracefully
@@ -244,7 +254,7 @@ class TestPermissionErrors:
         server_controller.run_client_command(["start", "sleep", "30", "--name", "test"])
 
         # Try to start server explicitly
-        returncode, stdout, stderr = server_controller.run_client_command(["server"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["server"])
 
         # Should detect existing server
         assert "already running" in stdout.lower() or returncode == 0
@@ -253,20 +263,19 @@ class TestPermissionErrors:
 class TestProcessCleanup:
     """Test process cleanup in edge cases."""
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason="PID journal cleanup happens on graceful shutdown")
-    async def test_orphaned_process_cleanup(
+    def test_orphaned_process_cleanup(
         self, server_controller, unique_socket_path: Path
     ):
         """Test that orphaned processes are cleaned up on server restart."""
         # Start a long-running process
-        returncode, stdout, stderr = server_controller.run_client_command(
+        returncode, stdout, _stderr = server_controller.run_client_command(
             ["start", "sleep", "300", "--name", "orphan-test"]
         )
         assert returncode == 0
 
         # Get the process list to find PID
-        returncode, stdout, stderr = server_controller.run_client_command(["list"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["list"])
         assert returncode == 0
 
         # Extract PID from output (format: [1] orphan-test: running (PID: 12345))
@@ -283,10 +292,14 @@ class TestProcessCleanup:
 
             for proc in psutil.process_iter(["pid", "cmdline"]):
                 cmdline = proc.info.get("cmdline", [])
-                if cmdline and "climux.py" in str(cmdline) and "server" in cmdline:
-                    if str(unique_socket_path) in str(cmdline):
-                        server_pid = proc.info["pid"]
-                        break
+                if (
+                    cmdline
+                    and "climux.py" in str(cmdline)
+                    and "server" in cmdline
+                    and str(unique_socket_path) in str(cmdline)
+                ):
+                    server_pid = proc.info["pid"]
+                    break
         except Exception:
             pass
 
@@ -302,7 +315,7 @@ class TestProcessCleanup:
             process_still_alive = False
 
         # Start new server - should clean up orphaned process via PID journal
-        returncode, stdout, stderr = server_controller.run_client_command(["ping"])
+        returncode, stdout, _stderr = server_controller.run_client_command(["ping"])
 
         # Give cleanup time to work
         if process_still_alive:

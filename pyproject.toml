@@ -22,7 +22,7 @@ dev-dependencies = [
   "psutil",  # For process monitoring in tests
   "types-psutil",  # Type stubs for psutil
     # Lint
-  "ruff",
+  "ruff>=0.16.0",
   "mypy",
   "typing-extensions",
 ]
@@ -39,7 +39,10 @@ files = [
 target-version = "py312"
 
 [tool.ruff.lint]
-select = [
+# `select` is deliberately unset: ruff 0.16 enables a curated default rule
+# set, and an explicit `select` would replace it rather than extend it.
+# `extend-select` layers this project's additional linters on top.
+extend-select = [
   "E", # pycodestyle
   "F", # pyflakes
   "I", # isort
@@ -77,6 +80,27 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "*/__init__.py" = ["F401"]
+"climux.py" = [
+  # climux supervises processes it does not control and serves clients it
+  # does not trust. A failed spawn has to become a `failed` status, a
+  # reader fault has to become a log line, and any handler error has to
+  # become a JSON-RPC error object -- whatever the child or the caller
+  # raised. Narrowing these handlers would let one bad child take the
+  # server down.
+  "BLE001", # flake8-blind-except
+  # The two silent handlers run where there is nothing left to log to: a
+  # client that hung up mid-response, and stale-PID reaping that happens
+  # before the server owns a socket. Both already unlink their leftovers
+  # in a `finally`.
+  "S110", # flake8-bandit
+]
+"tests/*" = [
+  # The crash and orphan tests locate the server by scanning every
+  # process on the machine with psutil. A scan that trips over a process
+  # that vanished mid-iteration is retried, not diagnosed.
+  "BLE001", # flake8-blind-except
+  "S110", # flake8-bandit
+]
 
 [tool.pytest.ini_options]
 addopts = "--tb=short --no-header --showlocals --doctest-modules --strict-markers"
