@@ -121,11 +121,11 @@ class TestServerLifecycle:
     ):
         """Test that server can optionally clean up when last process exits."""
         # This tests the capability, even if not default behavior
-        server = await managed_server["start_server"]()
+        await managed_server["start_server"]()
         client = ClimuxClient(unique_socket_path)
 
         # Start a short-lived process
-        proc = await client.request(
+        await client.request(
             "start", {"command": ["echo", "test"], "name": "short-lived"}
         )
 
