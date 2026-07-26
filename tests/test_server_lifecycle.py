@@ -237,7 +237,6 @@ class TestServerAttachment:
     async def test_server_detach_leaves_running(self, server_controller):
         """Test that detaching leaves server running."""
         # This would test Ctrl+C or 'detach' command behavior
-        pass
 
 
 class TestServerRobustness:
