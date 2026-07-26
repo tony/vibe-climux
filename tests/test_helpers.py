@@ -48,7 +48,8 @@ class DebugClient(ClimuxClient):
 
             if self.debug:
                 test_logger.debug(
-                    f"[Response #{self.request_count}] {method} completed in {elapsed:.3f}s: {result}"
+                    f"[Response #{self.request_count}] {method} "
+                    f"completed in {elapsed:.3f}s: {result}"
                 )
 
             self.request_history.append((method, params or {}, result))
@@ -58,7 +59,8 @@ class DebugClient(ClimuxClient):
             elapsed = time.monotonic() - start_time
             if self.debug:
                 test_logger.error(
-                    f"[Error #{self.request_count}] {method} failed after {elapsed:.3f}s: {e}"
+                    f"[Error #{self.request_count}] {method} "
+                    f"failed after {elapsed:.3f}s: {e}"
                 )
             self.request_history.append((method, params or {}, e))
             raise
