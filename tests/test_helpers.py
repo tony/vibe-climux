@@ -57,7 +57,7 @@ class DebugClient(ClimuxClient):
         except Exception as e:
             elapsed = time.monotonic() - start_time
             if self.debug:
-                test_logger.error(
+                test_logger.warning(
                     f"[Error #{self.request_count}] {method} "
                     f"failed after {elapsed:.3f}s: {e}"
                 )
@@ -229,8 +229,8 @@ class ProcessMonitor:
             try:
                 processes = await self.client.request("list")
                 self.snapshots.append((time.monotonic(), processes))
-            except Exception as e:
-                test_logger.error(f"Monitor error: {e}")
+            except Exception:
+                test_logger.exception("Monitor error")
 
             await asyncio.sleep(interval)
 
