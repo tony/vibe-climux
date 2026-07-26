@@ -80,6 +80,21 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "*/__init__.py" = ["F401"]
+"climux.py" = [
+  # climux supervises processes it does not control and serves clients it
+  # does not trust. A failed spawn has to become a `failed` status, a
+  # reader fault has to become a log line, and any handler error has to
+  # become a JSON-RPC error object -- whatever the child or the caller
+  # raised. Narrowing these handlers would let one bad child take the
+  # server down.
+  "BLE001", # flake8-blind-except
+]
+"tests/*" = [
+  # The crash and orphan tests locate the server by scanning every
+  # process on the machine with psutil. A scan that trips over a process
+  # that vanished mid-iteration is retried, not diagnosed.
+  "BLE001", # flake8-blind-except
+]
 
 [tool.pytest.ini_options]
 addopts = "--tb=short --no-header --showlocals --doctest-modules --strict-markers"
