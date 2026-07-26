@@ -53,7 +53,6 @@ class DebugClient(ClimuxClient):
                 )
 
             self.request_history.append((method, params or {}, result))
-            return result
 
         except Exception as e:
             elapsed = time.monotonic() - start_time
@@ -64,6 +63,9 @@ class DebugClient(ClimuxClient):
                 )
             self.request_history.append((method, params or {}, e))
             raise
+
+        else:
+            return result
 
     def get_last_request(self) -> tuple[str, dict[str, Any], Any]:
         """Get the last request made."""

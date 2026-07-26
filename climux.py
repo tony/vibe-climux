@@ -172,12 +172,14 @@ class ManagedProcess:
             self._monitor_task = asyncio.create_task(self._monitor_exit())
 
             self._add_log("system", f"Process started with PID {self.pid}")
-            return True
 
         except Exception as e:
             self.status = "failed"
             self._add_log("system", f"Failed to start: {e}")
             return False
+
+        else:
+            return True
 
     async def stop(self) -> bool:
         """Stop the process gracefully."""
@@ -212,10 +214,11 @@ class ManagedProcess:
             self.process.stdin.write(data.encode())
             await self.process.stdin.drain()
             self._add_log("stdin", data.rstrip())
-            return True
         except (BrokenPipeError, ConnectionResetError) as e:
             self._add_log("system", f"Failed to write to stdin: {e}")
             return False
+        else:
+            return True
 
     def get_status(self) -> dict[str, Any]:
         """Get current status as a dictionary."""
@@ -450,9 +453,10 @@ class ClimuxServer:
 
         try:
             result = await handler(params)
-            return {"jsonrpc": "2.0", "result": result, "id": req_id}
         except Exception as e:
             return self._error_response(-32000, str(e), req_id)
+        else:
+            return {"jsonrpc": "2.0", "result": result, "id": req_id}
 
     # --- Request handlers ---
 
@@ -647,10 +651,11 @@ def is_server_running(socket_path: Path) -> bool:
     try:
         client = ClimuxClient(socket_path)
         result = asyncio.run(client.request("ping"))
-        return result == "pong"
     except (RuntimeError, ConnectionRefusedError, FileNotFoundError):
         # Socket exists but server not responding - stale socket
         return False
+    else:
+        return result == "pong"
 
 
 def start_server_daemon(socket_path: Path) -> None:
