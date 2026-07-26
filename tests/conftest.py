@@ -397,7 +397,8 @@ class ServerController:
             "-S",
             str(self.socket_path),
             "server",
-        ] + args
+            *args,
+        ]
         self.process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -429,7 +430,7 @@ class ServerController:
 
     def run_client_command(self, args: list[str]) -> tuple[int, str, str]:
         """Run a client command against the server."""
-        cmd = [sys.executable, "climux.py", "-S", str(self.socket_path)] + args
+        cmd = [sys.executable, "climux.py", "-S", str(self.socket_path), *args]
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -473,7 +474,7 @@ def cli_runner(unique_socket_path: Path) -> Generator[Any, None, None]:
 
     def run(args: list[str], check_server: bool = True) -> tuple[int, str, str]:
         """Run a climux command."""
-        cmd = [sys.executable, "climux.py", "-S", str(unique_socket_path)] + args
+        cmd = [sys.executable, "climux.py", "-S", str(unique_socket_path), *args]
 
         # Check if this might start a server
         if check_server and args and args[0] != "server":
