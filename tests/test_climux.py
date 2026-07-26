@@ -718,14 +718,13 @@ class TestStress:
         num_processes = 50
 
         # Start many processes
-        tasks = []
-        for i in range(num_processes):
-            tasks.append(
-                process_factory.create(
-                    [sys.executable, str(counter_script), "2", "0.01"],
-                    name=f"stress-{i}",
-                )
+        tasks = [
+            process_factory.create(
+                [sys.executable, str(counter_script), "2", "0.01"],
+                name=f"stress-{i}",
             )
+            for i in range(num_processes)
+        ]
 
         await asyncio.gather(*tasks)
 

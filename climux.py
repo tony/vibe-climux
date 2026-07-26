@@ -373,10 +373,11 @@ class ClimuxServer:
         self._running = False
 
         # Stop all processes
-        tasks = []
-        for process in self.processes.values():
-            if process.status == "running":
-                tasks.append(process.stop())
+        tasks = [
+            process.stop()
+            for process in self.processes.values()
+            if process.status == "running"
+        ]
 
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
