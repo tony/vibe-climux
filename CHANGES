@@ -20,6 +20,13 @@ $ uv add climux --prerelease allow
 _Notes on the upcoming release will go here._
 <!-- END PLACEHOLDER - ADD NEW CHANGELOG ENTRIES BELOW THIS LINE -->
 
+### Documentation
+
+#### Process and log fields are documented (#4)
+
+The dataclasses describing managed processes, their configuration, and
+captured log entries now say what each field holds.
+
 <!---
 .. vim: set filetype=markdown:
 -->
