@@ -225,7 +225,7 @@ class ProcessFactory:
 async def process_factory(
     climux_client: ClimuxClient,
 ) -> AsyncGenerator[ProcessFactory, None]:
-    """Factory for creating test processes with automatic cleanup."""
+    """Create test processes, stopping every one of them on teardown."""
     factory = ProcessFactory(climux_client)
     try:
         yield factory

@@ -690,7 +690,7 @@ def start_server_daemon(socket_path: Path) -> None:
 
 
 def main() -> None:
-    """Main entry point."""
+    """Parse the command line and run the requested climux subcommand."""
     parser = argparse.ArgumentParser(
         description="Climux: A headless CLI process manager"
     )
