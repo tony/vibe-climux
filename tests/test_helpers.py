@@ -124,7 +124,8 @@ async def debug_server(
             server_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await server_task
-            raise TimeoutError(f"Server socket not created within {timeout}s")
+            msg = f"Server socket not created within {timeout}s"
+            raise TimeoutError(msg)
         await asyncio.sleep(0.05)
 
     try:
@@ -159,7 +160,8 @@ async def wait_for_process_status(
                     return proc
                 break
         else:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         await asyncio.sleep(poll_interval)
 
@@ -167,12 +169,14 @@ async def wait_for_process_status(
     processes = await client.request("list")
     for proc in processes:
         if proc["id"] == process_id:
-            raise TimeoutError(
+            msg = (
                 f"Process {process_id} did not reach status '{expected_status}' "
                 f"within {timeout}s. Current status: {proc['status']}"
             )
+            raise TimeoutError(msg)
 
-    raise ValueError(f"Process {process_id} disappeared while waiting")
+    msg = f"Process {process_id} disappeared while waiting"
+    raise ValueError(msg)
 
 
 async def get_process_logs_with_retry(
@@ -265,10 +269,11 @@ def assert_log_contains(
     )
 
     source_msg = f" in source '{source}'" if source else ""
-    raise AssertionError(
+    msg = (
         f"Expected content '{expected_content}'{source_msg} not found in logs.\n"
         f"Last 10 log entries:\n{log_summary}"
     )
+    raise AssertionError(msg)
 
 
 def assert_process_in_list(
@@ -300,7 +305,8 @@ def assert_process_in_list(
         f"  [{p['id']}] {p['name']}: {p['status']}" for p in processes
     )
 
-    raise AssertionError(
+    msg = (
         f"No process found matching criteria: {', '.join(criteria)}\n"
         f"Available processes:\n{process_summary}"
     )
+    raise AssertionError(msg)

@@ -500,7 +500,8 @@ class ClimuxServer:
         process_id = params.get("id")
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         await process.stop()
         self._update_pid_journal()
@@ -511,7 +512,8 @@ class ClimuxServer:
         process_id = params.get("id")
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         await process.restart()
         self._update_pid_journal()
@@ -524,7 +526,8 @@ class ClimuxServer:
 
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         success = await process.send_input(data)
         if not success:
@@ -540,7 +543,8 @@ class ClimuxServer:
 
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         return process.get_logs(lines=lines)
 
@@ -556,7 +560,8 @@ class ClimuxServer:
 
         process = self.processes.get(process_id)
         if not process:
-            raise ValueError(f"Process {process_id} not found")
+            msg = f"Process {process_id} not found"
+            raise ValueError(msg)
 
         return process.get_logs(lines=lines)
 
@@ -618,7 +623,8 @@ class ClimuxClient:
         try:
             reader, writer = await asyncio.open_unix_connection(str(self.socket_path))
         except (FileNotFoundError, ConnectionRefusedError) as e:
-            raise RuntimeError(f"Cannot connect to server at {self.socket_path}") from e
+            msg = f"Cannot connect to server at {self.socket_path}"
+            raise RuntimeError(msg) from e
 
         request = {
             "jsonrpc": "2.0",
@@ -640,7 +646,8 @@ class ClimuxClient:
 
         response = json.loads(response_data.decode())
         if "error" in response:
-            raise RuntimeError(f"Server error: {response['error']['message']}")
+            msg = f"Server error: {response['error']['message']}"
+            raise RuntimeError(msg)
 
         return response.get("result")
 
