@@ -98,9 +98,7 @@ async def climux_client(
     climux_server: ClimuxServer,
     unique_socket_path: Path,
 ) -> ClimuxClient:
-    """
-    Create a ClimuxClient connected to the test server.
-    """
+    """Create a ClimuxClient connected to the test server."""
     return ClimuxClient(unique_socket_path)
 
 
@@ -227,9 +225,7 @@ class ProcessFactory:
 async def process_factory(
     climux_client: ClimuxClient,
 ) -> AsyncGenerator[ProcessFactory, None]:
-    """
-    Factory for creating test processes with automatic cleanup.
-    """
+    """Factory for creating test processes with automatic cleanup."""
     factory = ProcessFactory(climux_client)
     try:
         yield factory
