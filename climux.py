@@ -464,7 +464,8 @@ class ClimuxServer:
         """Start a new process."""
         command = params.get("command", [])
         if not command:
-            raise ValueError("Command is required")
+            msg = "Command is required"
+            raise ValueError(msg)
 
         config = ProcessConfig(
             command=command,
@@ -487,7 +488,8 @@ class ClimuxServer:
             return process.get_status()
         else:
             del self.processes[process_id]
-            raise RuntimeError("Failed to start process")
+            msg = "Failed to start process"
+            raise RuntimeError(msg)
 
     async def _handle_list(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """List all processes."""
@@ -526,7 +528,8 @@ class ClimuxServer:
 
         success = await process.send_input(data)
         if not success:
-            raise RuntimeError("Failed to send input")
+            msg = "Failed to send input"
+            raise RuntimeError(msg)
 
         return {"status": "sent", "id": process_id}
 
@@ -632,7 +635,8 @@ class ClimuxClient:
         await writer.wait_closed()
 
         if not response_data:
-            raise RuntimeError("Empty response from server")
+            msg = "Empty response from server"
+            raise RuntimeError(msg)
 
         response = json.loads(response_data.decode())
         if "error" in response:

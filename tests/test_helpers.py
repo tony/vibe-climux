@@ -70,7 +70,8 @@ class DebugClient(ClimuxClient):
     def get_last_request(self) -> tuple[str, dict[str, Any], Any]:
         """Get the last request made."""
         if not self.request_history:
-            raise ValueError("No requests have been made")
+            msg = "No requests have been made"
+            raise ValueError(msg)
         return self.request_history[-1]
 
     def clear_history(self) -> None:

@@ -321,7 +321,8 @@ async def managed_server(
     async def start_server() -> ClimuxServer:
         nonlocal server, server_task
         if server is not None:
-            raise RuntimeError("Server already running")
+            msg = "Server already running"
+            raise RuntimeError(msg)
 
         server = ClimuxServer(unique_socket_path)
         server_task = asyncio.create_task(server.start())
@@ -333,7 +334,8 @@ async def managed_server(
             await asyncio.sleep(0.05)
         else:
             server_task.cancel()
-            raise RuntimeError("Server failed to start")
+            msg = "Server failed to start"
+            raise RuntimeError(msg)
 
         return server
 
@@ -406,7 +408,8 @@ class ServerController:
             time.sleep(0.1)
         else:
             self.stop_server_subprocess()
-            raise RuntimeError("Server subprocess failed to create socket")
+            msg = "Server subprocess failed to create socket"
+            raise RuntimeError(msg)
 
         return self.process
 
