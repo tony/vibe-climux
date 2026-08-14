@@ -352,6 +352,42 @@ These rules apply when authoring entries in `CHANGES`, which is rendered as the 
 
 **Summarization style.** When a user asks "what changed in the latest version?" or similar, lead with the entry's lead paragraph (paraphrased if needed), followed by each `####` deliverable heading under `### What's new` with a one-sentence summary. Cite `(#NN)` only if the user asks for source links. Don't invent versions, dates, or numbers not present in `CHANGES`. Don't quote line numbers or file offsets — those shift as the file evolves.
 
+## Documentation Standards
+
+### Code Blocks
+
+Code blocks are paste-and-run units: pasting one block runs exactly one
+intended action. Doctests and other executed examples are exempt — the test
+suite runs them, nobody pastes them.
+
+- **One command per block.** Multiple steps may share a block only when
+  explicitly chained with `&&`, `;`, or `\` continuations — the chain is
+  then one logical command.
+- **Explanations go in prose above the block**, never as `#` comments inside it.
+- **Command menus are per-command blocks with prose lead-ins**, not tables.
+- **Shell commands use the `console` tag with a `$ ` prefix.** This separates
+  interactive commands from scripts and enables prompt-aware copy.
+- **Split long commands with `\`** — one flag or flag+value pair per indented
+  continuation line, positional arguments last.
+
+Good:
+
+Show the last ten commits as a graph:
+
+```console
+$ git log \
+    --max-count=10 \
+    --graph \
+    --oneline
+```
+
+Bad:
+
+```console
+# Show the last ten commits as a graph
+$ git log --max-count=10 --graph --oneline
+```
+
 ## AI Slop Prevention
 
 Treat AI slop as **review-hostile noise**, not as proof that text or
