@@ -1,399 +1,255 @@
 # Climux
 
-A headless CLI process manager that bridges the gap between human developers and AI agents. Run background processes with the simplicity of `tmux` but with JSON-RPC control that AI can understand.
+Climux runs and supervises background processes behind a JSON-RPC 2.0
+server on a Unix domain socket, so a human at a terminal and a script or
+AI agent can start, watch, and stop the same long-running command through
+one interface. The server starts implicitly on the first command, like
+`tmux` — there is nothing to launch by hand first.
 
-## The Problem Climux Solves
+Climux needs Python 3.12 or newer and a POSIX system: it listens on a
+Unix domain socket, so it does not run on Windows. It has no runtime
+dependencies — everything it does is standard library.
 
-**For Developers:** You're juggling 5+ terminal windows - frontend, backend, database, tests, and logs. Alt-tabbing constantly. Losing track of what's running where. Missing important error messages in the chaos.
-
-**For AI Agents:** Current tools aren't built for programmatic control. Agents struggle with terminal emulators, can't reliably parse unstructured output, and have no way to manage long-running processes.
-
-**Climux:** One tool that works perfectly for both humans and machines.
-
-## Why Climux?
-
-### 🚀 For Local Development
-
-Transform this common scenario:
-```bash
-# Terminal 1: Frontend
-npm run dev
-
-# Terminal 2: Backend  
-python manage.py runserver
-
-# Terminal 3: Database
-docker-compose up postgres
-
-# Terminal 4: Redis
-redis-server
-
-# Terminal 5: Tests
-npm run test:watch
-
-# Terminal 6: Where did that error come from?!
-```
-
-Into this:
-```bash
-# Just start using climux - no server setup needed!
-climux start npm run dev --name frontend
-climux start python manage.py runserver --name backend
-climux start docker-compose up postgres --name db
-climux start redis-server --name redis
-climux start npm run test:watch --name tests
-
-# Now you have superpowers
-climux list                    # What's running?
-climux tail backend            # Watch backend logs
-climux logs frontend --lines 50 # What just happened?
-climux restart backend         # Quick restart
-climux send tests "r\n"        # Re-run tests
-```
-
-**Benefits:**
-- 📊 Single dashboard for all processes
-- 🔍 Never lose important logs
-- ⚡ Instant access to any process
-- 🔄 Easy restarts without finding the right terminal
-- 📝 Searchable history across all processes
-
-### 🤖 For AI/Agent Workflows
-
-Climux speaks JSON-RPC, making it the perfect bridge between AI and system processes:
-
-```python
-# AI agents can now control processes like a senior developer
-async def deploy_and_monitor(client: ClimuxClient):
-    # Start the deployment
-    deploy = await client.request(
-        "start", {"command": ["./deploy.sh", "production"], "name": "deployment"}
-    )
-
-    # Watch for completion or errors
-    while True:
-        logs = await client.request("logs", {"id": deploy["id"], "lines": 10})
-
-        # AI can understand structured output
-        for log in logs:
-            if "ERROR" in log["content"]:
-                # Intelligent error handling
-                await handle_deployment_error(log)
-                break
-            elif "Deployment complete" in log["content"]:
-                # Success! Start monitoring
-                await start_monitoring(client)
-                break
-
-        await asyncio.sleep(5)
-```
-
-**Why it's perfect for AI:**
-- 📋 Structured JSON responses (not raw terminal chaos)
-- 🎯 Precise process control (start, stop, restart, send input)
-- 📊 Reliable log parsing with timestamps and sources
-- 🔄 Stateless operations (no terminal state to manage)
-- 🛡️ Safe interaction (can't accidentally break the terminal)
-
-## Core Features
-
-- **Implicit Server Start**: Like tmux, the server starts automatically when needed
-- **Parallel Task Execution**: Fire off multiple tasks and check results later
-- **Standard Library Only**: Zero dependencies, works with Python 3.13+
-- **JSON-RPC 2.0**: Structured communication protocol that's LLM-friendly
-- **Full Process Control**: Start, stop, restart, send input, capture output
-- **Smart Buffering**: Configurable line and time-based log retention
-- **Guaranteed Cleanup**: PID journaling ensures no orphaned processes
-- **Asyncio-based**: Efficient concurrent process management
-- **Type-Safe**: Fully typed for better IDE support and fewer bugs
-
-## 🚀 The Power of Parallel Execution
-
-One of climux's superpowers is **deferred parallel execution**. Instead of waiting for each task to complete, you can:
-
-```bash
-# Fire off multiple tasks in parallel
-climux start "ruff check ." --name ruff-check
-climux start "ruff format . --check" --name ruff-format
-climux start "mypy ." --name mypy
-climux start "pytest" --name tests
-
-# Continue working while they run...
-# Then check results when convenient
-climux logs ruff-check
-climux logs mypy --lines 50
-```
-
-**For Developers**: Run all your linters, formatters, and tests simultaneously. No more waiting for one to finish before starting the next.
-
-**For AI Agents**: Fire off multiple analysis tasks, continue reasoning about the problem, then circle back to collect results:
-
-```python
-# AI agent can parallelize investigation
-await client.request("start", {"command": ["biome", "lint"], "name": "lint"})
-await client.request("start", {"command": ["biome", "check"], "name": "check"})
-await client.request("start", {"command": ["biome", "format"], "name": "format"})
-
-# Continue with other reasoning tasks...
-# Then collect all results when needed
-lint_result = await client.request("logs", {"id": lint_id})
-check_result = await client.request("logs", {"id": check_id})
-format_result = await client.request("logs", {"id": format_id})
-```
-
-## 10-Second Pitch
-
-**Without Climux:**
-- 🪟 Alt-tab between 10 terminal windows
-- 😵 Lose track of which process is which
-- 🔍 Scroll through walls of logs to find that one error
-- 🔄 Kill and restart processes manually
-- 🤖 AI agents can't help - they can't control terminals
-
-**With Climux:**
-- 📋 `climux list` - See everything at a glance
-- 🎯 `climux tail backend` - Jump to any process instantly  
-- 📊 `climux logs api --lines 50` - Get exactly what you need
-- ⚡ `climux restart frontend` - One command, done
-- 🤝 AI agents can manage your dev environment for you
+There is no installed console script yet. `climux.py` at the repository
+root is the whole distribution; the sections below write `climux` for
+readability, on the assumption it is on your `PATH` (see
+[Quick Start](#quick-start)).
 
 ## Quick Start
 
-```bash
-# Install development environment
-uv sync --all-extras --dev
+```console
+$ git clone https://github.com/tony/vibe-climux.git
+```
 
-# Just start using climux - server starts automatically!
-climux start python -m http.server 8000 --name webserver
-climux list
-climux logs webserver
+```console
+$ cd vibe-climux && uv sync --all-extras --dev
+```
+
+Put `climux.py` on your `PATH` as `climux`:
+
+```console
+$ ln -s "$(pwd)/climux.py" ~/.local/bin/climux
+```
+
+Or skip that and run it directly wherever a command below says `climux`:
+
+```console
+$ uv run python climux.py --help
+```
+
+Start a process, see it listed, read its output, then stop it. A fresh
+process gets ID `1`, which `climux list` also reports:
+
+```console
+$ climux start python -m http.server 8000 --name webserver
+```
+
+```console
+$ climux list
+```
+
+```console
+$ climux logs 1
+```
+
+```console
+$ climux stop 1
+```
+
+The server that started implicitly keeps running after this shell
+session ends, ready for the next command — stop it by stopping every
+process on its socket, or leave it; it costs nothing idle.
+
+## Why Climux?
+
+Local development means juggling one terminal per process — frontend,
+backend, database, a test watcher — and losing track of which one just
+printed an error. Climux gives every process a name and a single place
+to check on, list, and restart them. Addressing is by ID — `climux list`
+reports which ID belongs to which name — and `frontend` here is the
+first process started, so it is ID `1`:
+
+```console
+$ climux start npm run dev --name frontend
+```
+
+```console
+$ climux start python manage.py runserver --name backend
+```
+
+```console
+$ climux start docker compose up postgres --name db
+```
+
+```console
+$ climux tail 1
+```
+
+An AI agent cannot drive a terminal emulator reliably, but it can hold a
+JSON-RPC connection and parse structured log entries. This lets an agent
+start a task, keep reasoning about something else, and come back for the
+result instead of blocking on it:
+
+```python
+import asyncio
+
+from climux import ClimuxClient
+
+
+async def deploy_and_watch(client: ClimuxClient) -> None:
+    """Start a deploy, then poll its log until it finishes or errors."""
+    deploy = await client.request(
+        "start", {"command": ["./deploy.sh", "production"], "name": "deploy"}
+    )
+    while True:
+        entries = await client.request("logs", {"id": deploy["id"], "lines": 10})
+        for entry in entries:
+            if "ERROR" in entry["content"]:
+                raise RuntimeError(entry["content"])
+            if "deploy complete" in entry["content"]:
+                return
+        await asyncio.sleep(5)
+```
+
+The same start-then-poll shape is what a CI bot driving several test
+suites, a production-monitoring agent watching log output for anomalies,
+or a coding assistant setting up a dev environment would build on top of
+`client.request`.
+
+## Core Features
+
+- **Implicit server start.** The server starts on the first client
+  command and persists after that client exits, like `tmux`.
+- **JSON-RPC 2.0 over a Unix socket.** One typed request/response
+  protocol for both the CLI and programmatic clients.
+- **Named, addressable processes.** Give a process a name at start time;
+  address it by the ID `climux list` reports.
+- **Configurable log retention.** Each process buffers its own output —
+  1000 lines or 24 hours by default, whichever limit is hit first.
+- **stdin passthrough.** Send input to a running process's stdin from
+  the CLI or over JSON-RPC.
+- **PID journal cleanup.** A journal file survives a server crash, so
+  the next server start reaps orphaned children before binding its
+  socket.
+- **No runtime dependencies.** The server, client, and CLI are one
+  standard-library file.
+
+## Usage
+
+Read buffered output, most recent last; `--lines` caps how many:
+
+```console
+$ climux logs 1 --lines 50
+```
+
+`tail` returns the same buffered output as `logs` today — there is no
+separate follow mode yet:
+
+```console
+$ climux tail 1
+```
+
+`snapshot` is `logs` with a smaller default (25 lines):
+
+```console
+$ climux snapshot 1
+```
+
+Send input to a process's stdin. A trailing newline is added
+automatically if the data does not already end with one:
+
+```console
+$ climux send 1 y
+```
+
+Restart or stop by ID:
+
+```console
+$ climux restart 1
+```
+
+```console
+$ climux stop 1
 ```
 
 ## Real-World Use Cases
 
-### 💻 Local Development Workflows
+### The "Full Stack Startup" Script
 
-#### The "Full Stack Startup" Script
-Save this as `dev.sh` and never juggle terminals again:
+Save as `dev.sh`; running it starts the whole stack, `./dev.sh stop`
+tears it down:
+
 ```bash
 #!/bin/bash
-# Climux starts automatically - no setup needed!
+# Climux starts automatically -- no setup needed.
 
-# Start your entire stack
 climux start npm run dev --name frontend --cwd ./frontend
-climux start python manage.py runserver --name api --cwd ./backend  
-climux start docker-compose up postgres redis --name services
-climux start npm run test:watch --name tests --cwd ./frontend
+climux start python manage.py runserver --name api --cwd ./backend
+climux start docker compose up postgres redis --name services
 climux start python manage.py celery worker --name worker --cwd ./backend
 
-echo "🚀 Dev environment ready!"
-echo "Commands:"
-echo "  climux list          - See all processes"
-echo "  climux tail <name>   - Follow logs"
-echo "  climux restart <name> - Restart a service"
-echo "  ./dev.sh stop        - Stop everything"
+echo "Dev environment ready. climux list / climux tail <id> to inspect it."
 
 if [ "$1" = "stop" ]; then
-    for id in $(climux list | grep -o '^[0-9]*'); do
-        climux stop $id
+    for id in $(climux list | cut -d']' -f1 | tr -d '['); do
+        climux stop "$id"
     done
 fi
 ```
 
-#### Debugging Production Issues Locally
+### Debugging Production Issues Locally
+
 ```bash
-# Reproduce production environment locally
-climux start python app.py --name api --env ENVIRONMENT=staging
-climux start node worker.js --name worker --env ENVIRONMENT=staging
-climux start redis-server --config redis.prod.conf --name redis
+export ENVIRONMENT=staging
+climux start python app.py --name api
+climux start node worker.js --name worker
+climux start redis-server redis.prod.conf --name redis
 
-# Reproduce the issue
-climux send api "trigger_bug_endpoint\n"
-
-# Capture everything
-climux logs api --lines 1000 > api_debug.log
-climux logs worker --lines 1000 > worker_debug.log
-
-# Interactive debugging
-climux send api "import pdb; pdb.set_trace()\n"
-climux tail api  # Now you can debug interactively!
+climux send 1 trigger_bug_endpoint
+climux logs 1 --lines 1000 > api_debug.log
 ```
 
-#### Microservices Development
+### Microservices Development
+
+Process control today is by the ID `climux list` reports, not by name —
+start the batch, then check on all of them at once:
+
 ```bash
-# Start 10 microservices without 10 terminals
-for service in auth user product cart payment shipping inventory search recommendation analytics; do
-    climux start npm run dev --name $service --cwd ./services/$service
+for service in auth user product cart payment shipping inventory \
+    search recommendation analytics; do
+    climux start npm run dev --name "$service" --cwd "./services/$service"
 done
-
-# Health check all services
-for service in $(climux list | awk '{print $2}' | grep -v "name"); do
-    echo "Checking $service..."
-    climux logs $service --lines 5 | grep -q "Ready" && echo "✅ $service is ready"
-done
-
-# Restart a specific service after code changes
-climux restart cart
-
-# See which services are consuming most resources
-climux list  # Shows PIDs
-# Use htop/top to monitor those specific PIDs
+climux list
 ```
 
-### 🤖 AI Agent Workflows
+### One-Liner Dev Environment
 
-#### Autonomous Development Assistant
-```python
-class DevAssistant:
-    """AI assistant that manages your development environment."""
-
-    def __init__(self, climux_client):
-        self.client = climux_client
-        self.processes = {}
-
-    async def setup_project(self, project_type: str):
-        """Intelligently set up a development environment."""
-        if project_type == "django":
-            # Start database first
-            db = await self.client.request(
-                "start",
-                {
-                    "command": ["docker", "run", "-p", "5432:5432", "postgres"],
-                    "name": "database",
-                },
-            )
-
-            # Wait for database to be ready
-            await self.wait_for_log(db["id"], "database system is ready")
-
-            # Run migrations
-            migrate = await self.client.request(
-                "start",
-                {"command": ["python", "manage.py", "migrate"], "name": "migrations"},
-            )
-            await self.wait_for_completion(migrate["id"])
-
-            # Start the dev server
-            server = await self.client.request(
-                "start",
-                {
-                    "command": ["python", "manage.py", "runserver"],
-                    "name": "django-server",
-                },
-            )
-
-            return "✅ Django environment ready at http://localhost:8000"
-
-    async def diagnose_issue(self, error_description: str):
-        """Analyze logs across all processes to diagnose issues."""
-        all_processes = await self.client.request("list")
-
-        for proc in all_processes:
-            if proc["status"] == "exited" and proc["exit_code"] != 0:
-                # Get error logs
-                logs = await self.client.request(
-                    "logs", {"id": proc["id"], "lines": 50}
-                )
-
-                # AI analyzes the logs
-                error_analysis = self.analyze_error_logs(logs)
-                if error_analysis["confidence"] > 0.8:
-                    # Attempt automatic fix
-                    await self.apply_fix(proc, error_analysis["solution"])
-```
-
-#### Continuous Integration Bot
-```python
-async def ci_pipeline(client: ClimuxClient, pr_number: int):
-    """AI-driven CI pipeline that adapts to project needs."""
-
-    # Detect project type and test requirements
-    project_files = os.listdir(".")
-    test_commands = detect_test_commands(project_files)
-
-    # Run all tests in parallel
-    test_processes = []
-    for cmd in test_commands:
-        proc = await client.request(
-            "start", {"command": cmd.split(), "name": f"test-{cmd[0]}"}
-        )
-        test_processes.append(proc)
-
-    # Monitor and report results
-    results = {}
-    for proc in test_processes:
-        status = await wait_for_completion(client, proc["id"])
-        logs = await client.request("logs", {"id": proc["id"]})
-
-        # Parse test results
-        results[proc["name"]] = parse_test_output(logs)
-
-    # Generate intelligent summary
-    return generate_ci_report(results, pr_number)
-```
-
-#### Production Monitoring Agent
-```python
-async def production_monitor(client: ClimuxClient):
-    """AI agent that monitors production-like environments."""
-
-    # Start monitoring dashboards
-    monitors = {
-        "logs": await client.request(
-            "start",
-            {"command": ["tail", "-f", "/var/log/app.log"], "name": "log-monitor"},
-        ),
-        "metrics": await client.request(
-            "start",
-            {"command": ["python", "collect_metrics.py"], "name": "metrics-collector"},
-        ),
-        "health": await client.request(
-            "start",
-            {"command": ["python", "health_check.py"], "name": "health-checker"},
-        ),
-    }
-
-    # Continuous monitoring loop
-    while True:
-        for name, proc in monitors.items():
-            logs = await client.request("logs", {"id": proc["id"], "lines": 100})
-
-            # AI analyzes patterns
-            anomalies = detect_anomalies(logs)
-            if anomalies:
-                await handle_production_issue(anomalies)
-
-        await asyncio.sleep(30)
-```
-
-### 🚀 Quick Productivity Wins
-
-#### One-Liner Dev Environment
 ```bash
-# Add to your .bashrc/.zshrc
 alias dev='climux start npm run dev --name fe && climux start python api.py --name be && climux list'
-alias dev-stop='climux list | grep -o "^[0-9]*" | xargs -I {} climux stop {}'
-alias dev-logs='climux logs $(climux list | fzf | cut -d" " -f1)'
+alias dev-stop='climux list | cut -d"]" -f1 | tr -d "[" | xargs -I {} climux stop {}'
+alias dev-logs='climux logs $(climux list | fzf | cut -d"]" -f1 | tr -d "[")'
 ```
 
-#### Git Hook for Automatic Testing
+### Git Hook for Automatic Testing
+
 ```bash
-# .git/hooks/pre-push
 #!/bin/bash
+# .git/hooks/pre-push
 climux start pytest --name tests
 climux start npm test --name js-tests
 
-# Wait for tests to complete
-while climux list | grep -E "tests.*running"; do sleep 1; done
+while climux list | grep -E "tests.*running"; do
+    sleep 1
+done
 
-# Check if tests passed
-if climux logs tests | grep -q "FAILED"; then
-    echo "❌ Tests failed! Push aborted."
+if climux logs 1 | grep -q "FAILED"; then
+    echo "Tests failed, push aborted."
     exit 1
 fi
 ```
 
-#### VSCode Task Integration
+### VSCode Task Integration
+
 ```json
 // .vscode/tasks.json
 {
@@ -406,9 +262,10 @@ fi
       "problemMatcher": []
     },
     {
+      // Replace 1 with the ID `climux list` reports for this process.
       "label": "View Backend Logs",
       "type": "shell",
-      "command": "climux tail backend",
+      "command": "climux tail 1",
       "problemMatcher": []
     }
   ]
@@ -418,63 +275,77 @@ fi
 ## Advanced Usage
 
 ### Socket Management
-```bash
-# Use named sockets for different environments
-climux -L dev server    # Development environment
-climux -L test server   # Test environment
-climux -L prod server   # Production monitoring
 
-# Connect to specific socket
-climux -L dev list
-climux -L test start pytest
+A named socket keeps environments apart — commands against one name
+never see processes started against another. Each name gets its own
+implicit server on first use, the same as the default socket does:
+
+```console
+$ climux -L dev start pytest --name tests
 ```
+
+```console
+$ climux -L test start pytest --name tests
+```
+
+```console
+$ climux -L dev list
+```
+
+Running `climux server` directly (rather than letting a command start
+one implicitly) runs the server in the foreground instead of
+daemonizing — useful to watch its output, but it will not return until
+stopped.
+
+`-S path` points at a full socket path instead of a name in the default
+directory, for when two environments must not even share that
+directory.
 
 ### Process Configuration
-```bash
-# Configure log retention
-climux start python app.py --name myapp --max-lines 5000 --max-hours 48
 
-# Set working directory
-climux start npm start --name frontend --cwd /path/to/frontend
+`--cwd` sets a process's working directory; `--max-lines` and
+`--max-hours` override the log-retention defaults (`0` or negative
+disables that limit):
 
-# Pass environment variables
-export API_KEY=secret
-climux start python api.py --name api
+```console
+$ climux start npm start --name frontend --cwd ./frontend --max-lines 5000
 ```
 
-### Debugging
-```bash
-# Get detailed process info
-climux list
-climux snapshot <id>  # Last 25 lines by default
-climux logs <id> --lines 100  # Get more history
+Environment variables are inherited the normal way — export before the
+first command starts the server in this session, and every process it
+spawns after that sees them:
 
-# Monitor in real-time
-climux tail <id>  # Follow logs (like tail -f)
-
-# Send input to processes
-climux send <id> "quit\n"
-climux send <id> "reload\n"
+```console
+$ export API_KEY=secret
 ```
 
 ## Architecture
 
 ### Design Principles
-- **Standard Library Only**: No external dependencies in production
-- **Asyncio-based**: All I/O uses asyncio for efficiency
-- **Type-Safe**: Full type annotations with mypy strict mode
-- **Testable**: Comprehensive test suite with pytest
-- **Clean**: Processes are guaranteed to be cleaned up
+
+Standard library only, asyncio for every I/O path, strict-mode mypy
+across the source and tests, and processes that are guaranteed to be
+cleaned up even after a server crash.
 
 ### Components
-- **Server**: Manages processes and handles JSON-RPC requests
-- **Client**: Sends commands to server via Unix socket
-- **Process Manager**: Handles subprocess lifecycle with asyncio
-- **Log Buffer**: Configurable retention by lines and time
-- **PID Journal**: Ensures cleanup even after crashes
+
+A `ClimuxServer` owns process state and answers JSON-RPC requests; a
+`ClimuxClient` sends them over the socket. Each `ManagedProcess` keeps
+its own log buffer and a `system`-sourced entry for lifecycle events
+(started, exited, signal sent). A PID journal on disk lets the next
+server start reap children an earlier, crashed server left running.
+
+The server binds a Unix socket (default:
+`<tempdir>/climux/default.sock`, where `<tempdir>` is
+`tempfile.gettempdir()`; override with `-L name` or `-S path`) and
+double-fork daemonizes so it outlives the client that started it. A
+second client command against the same socket reuses that server rather
+than starting another.
 
 ### Protocol
-Commands use JSON-RPC 2.0 over Unix sockets:
+
+The CLI and any other client speak JSON-RPC 2.0 over that socket:
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -490,47 +361,17 @@ Commands use JSON-RPC 2.0 over Unix sockets:
 ## Development
 
 ### Setup
-```bash
-# Clone the repository
-git clone <repo-url>
-cd climux
 
-# Install with uv (recommended)
-uv sync --all-extras --dev
-
-# Or with pip
-pip install -e ".[dev]"
+```console
+$ git clone https://github.com/tony/vibe-climux.git
 ```
 
-### Testing
-```bash
-# Run all tests
-uv run pytest
-
-# Run specific test
-uv run pytest tests/test_climux.py::TestBasicOperations
-
-# Run tests in parallel
-uv run pytest -n auto
-
-# Watch mode for development
-uv run pytest-watcher
+```console
+$ cd vibe-climux && uv sync --all-extras --dev
 ```
 
-### Code Quality
-```bash
-# Format code
-uv run ruff format .
-
-# Lint
-uv run ruff check .
-
-# Type check
-uv run mypy .
-
-# Run all checks
-uv run ruff check . && uv run ruff format . --check && uv run mypy .
-```
+The gates, the test suite, and pull request workflow are in
+[CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ## Comparison with Alternatives
 
@@ -545,11 +386,8 @@ uv run ruff check . && uv run ruff format . --check && uv run mypy .
 
 ## Contributing
 
-Contributions are welcome! Please ensure:
-- All tests pass (`uv run pytest`)
-- Code is formatted (`uv run ruff format .`)
-- Type checks pass (`uv run mypy .`)
-- New features include tests
+Prose and commit conventions are in [WRITING.md](.github/WRITING.md); the
+full workflow is in [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ## License
 
